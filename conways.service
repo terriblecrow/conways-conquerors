@@ -1,0 +1,16 @@
+[Unit]
+Description=Conway Conquerors (landing + juego + WebSocket)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/conways
+ExecStart=/usr/bin/node /opt/conways/server.js
+Restart=always
+RestartSec=3
+Environment=PORT=3000
+# Usuario sin privilegios (ajustá si tu usuario es otro)
+User=www-data
+
+[Install]
+WantedBy=multi-user.target

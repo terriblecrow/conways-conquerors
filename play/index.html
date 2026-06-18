@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>Conway's Conquerors</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml"/>
+<link rel="manifest" href="manifest.webmanifest"/>
+<meta name="theme-color" content="#070912"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@600;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#070912;--sf:#0f1118;--b1:#1e2230;--b2:#2a2f45;
+  --c1:#3d8ef0;--c1d:#1a5cb8;--c1bg:#091523;
+  --c2:#e85252;--c2d:#a82020;--c2bg:#1a0808;
+  --gold:#c8a020;--gbg:rgba(200,160,32,.09);
+  --tx:#e8eaf0;--mu:#6a7090;--dim:#2a2f45;
+  --mono:'Space Mono',monospace;--disp:'Syne',sans-serif;
+  --r:6px;
+}
+html,body{background:var(--bg);color:var(--tx);font-family:var(--mono);-webkit-font-smoothing:antialiased;min-height:100vh;overscroll-behavior:none}
+/* subtle lab background: faint grid + radial vignette */
+body{
+  display:flex;flex-direction:column;align-items:center;padding:12px 10px 20px;gap:0;touch-action:manipulation;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(61,142,240,.04), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 60%, rgba(232,82,82,.03), transparent 70%),
+    linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
+  background-size:100% 100%, 100% 100%, 22px 22px, 22px 22px;
+}
+
+/* ── header ── */
+header{width:100%;max-width:700px;display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;border-bottom:1px solid var(--b1);padding-bottom:8px;position:relative}
+header h1{font-family:var(--disp);font-size:18px;font-weight:800;letter-spacing:-.5px}
+header h1 span{color:var(--c1)}
+.ver{font-size:10px;color:var(--mu)}
+/* mute button */
+.mute-btn{font-size:14px;line-height:1;padding:4px 8px;border-radius:var(--r);border:1px solid var(--b2);background:transparent;color:var(--tx);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.mute-btn:hover{border-color:var(--gold);background:var(--gbg)}
+.mute-btn.muted{opacity:.55;border-color:var(--b1)}
+.mute-btn:active{transform:scale(.92)}
+
+/* tiny instrument dots in header */
+header::after{content:'';position:absolute;right:46px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:var(--c1);box-shadow:8px 0 0 var(--gold),16px 0 0 var(--c2);opacity:.5}
+
+/* ════════════ TUTORIAL ════════════ */
+#tutorial{display:none;position:fixed;inset:0;background:rgba(7,9,18,.97);z-index:100;flex-direction:column;align-items:center;justify-content:center;padding:20px;
+  background-image:radial-gradient(ellipse at 50% 50%, rgba(61,142,240,.05), transparent 60%)}
+#tut-box{width:100%;max-width:440px;background:var(--sf);border:1px solid var(--b1);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 40px rgba(61,142,240,.08)}
+#tut-canvas{width:100%;height:200px;display:block;background:var(--bg);border-bottom:1px solid var(--b1)}
+#tut-body{padding:18px 20px 16px}
+#tut-title{font-family:var(--disp);font-size:18px;font-weight:800;color:var(--tx);margin-bottom:10px;letter-spacing:-.3px}
+#tut-text{font-size:12px;color:var(--mu);line-height:1.7;white-space:pre-line;min-height:88px}
+#tut-nav{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-top:1px solid var(--b1);background:rgba(255,255,255,.02)}
+#tut-counter{font-size:11px;color:var(--mu);letter-spacing:.1em}
+.tut-btns{display:flex;gap:8px}
+.tbtn{font-family:var(--mono);font-size:12px;padding:7px 16px;border-radius:var(--r);border:1px solid var(--b2);background:transparent;color:var(--mu);cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.tbtn:not(:disabled):hover{border-color:var(--tx);color:var(--tx)}
+.tbtn:disabled{opacity:.3;cursor:default}
+.tbtn.primary{border-color:var(--gold);color:var(--gold);background:var(--gbg)}
+.tbtn.primary:hover{background:rgba(200,160,32,.18)}
+.tbtn.skip{border-color:transparent;color:var(--mu);text-decoration:underline;padding:7px 10px}
+.tbtn.skip:hover{color:var(--tx);border-color:transparent}
+#tut-skip-top{position:absolute;top:24px;right:24px;font-family:var(--mono);font-size:11px;color:var(--mu);background:transparent;border:none;cursor:pointer;letter-spacing:.06em;text-decoration:underline;-webkit-tap-highlight-color:transparent}
+#tut-skip-top:hover{color:var(--tx)}
+
+/* ════════════ LOBBY ════════════ */
+#lobby{display:none;position:fixed;inset:0;background:rgba(7,9,18,.97);z-index:90;flex-direction:column;align-items:center;justify-content:center;padding:20px;
+  background-image:radial-gradient(ellipse at 50% 45%, rgba(61,142,240,.05), transparent 55%), radial-gradient(ellipse at 50% 55%, rgba(232,82,82,.04), transparent 55%)}
+#lobby-box{width:100%;max-width:380px;background:var(--sf);border:1px solid var(--b1);border-radius:12px;padding:24px 22px;box-shadow:0 0 40px rgba(61,142,240,.06)}
+#lobby-title{font-family:var(--disp);font-size:22px;font-weight:800;margin-bottom:4px;text-align:center}
+#lobby-title span{color:var(--c1)}
+#lobby-sub{font-size:11px;color:var(--mu);text-align:center;margin-bottom:20px;letter-spacing:.04em}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:10px;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
+.field input,.field select{width:100%;font-family:var(--mono);font-size:13px;padding:9px 11px;border-radius:var(--r);border:1px solid var(--b2);background:var(--bg);color:var(--tx);transition:border-color .15s}
+.field input:focus,.field select:focus{outline:none;border-color:var(--c1)}
+.field input::placeholder{color:var(--dim)}
+#p1name{border-color:var(--c1d)}
+#p2name{border-color:var(--c2d)}
+.launch-btn{width:100%;font-family:var(--mono);font-size:14px;font-weight:700;padding:12px;border-radius:var(--r);border:1px solid var(--gold);background:var(--gbg);color:var(--gold);cursor:pointer;margin-top:8px;letter-spacing:.04em;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.launch-btn:hover{background:rgba(200,160,32,.2)}
+.check-label{display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:11px;color:var(--mu);line-height:1.5;text-transform:none;letter-spacing:0}
+.check-label input{width:auto;margin-top:1px;accent-color:var(--gold);cursor:pointer}
+.check-label strong{color:var(--tx)}
+#online-waiting{display:none;margin-top:14px;padding:12px;border:1px dashed var(--b2);border-radius:var(--r);text-align:center}
+#lobby-list{display:flex;flex-direction:column;gap:7px;margin-top:6px;max-height:240px;overflow-y:auto}
+.lobby-room{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--b1);border-radius:var(--r);background:var(--sf);transition:border-color .15s}
+.lobby-room:hover{border-color:var(--b2)}
+.lobby-room .lr-flag{font-size:18px;line-height:1}
+.lobby-room .lr-info{flex:1;min-width:0}
+.lobby-room .lr-host{font-size:13px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lobby-room .lr-meta{font-size:10px;color:var(--mu);margin-top:1px}
+.lobby-room .lr-join{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.05em;
+  background:var(--gbg);color:var(--gold);border:1px solid rgba(200,160,32,.35);border-radius:5px;
+  padding:6px 14px;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.lobby-room .lr-join:hover{background:rgba(200,160,32,.2)}
+.lobby-refresh{font-size:10px;color:var(--mu);margin-top:8px;cursor:pointer;text-decoration:underline}
+#online-waiting .ws-label{font-size:11px;color:var(--mu);margin-bottom:6px}
+#online-room-display{font-family:var(--disp);font-size:24px;font-weight:800;color:var(--gold);letter-spacing:.1em}
+#online-hint{font-size:10px;color:var(--mu);margin-top:8px;line-height:1.5}
+
+/* ════════════ GAME UI ════════════ */
+#game-ui{display:none;flex-direction:column;align-items:center;width:100%}
+
+#hud{display:grid;grid-template-columns:1fr 84px 1fr;gap:6px;align-items:start;width:100%;max-width:700px;margin-bottom:8px}
+.pcard{background:linear-gradient(180deg,var(--sf),rgba(15,17,24,.6));border:1px solid var(--b1);border-radius:var(--r);padding:8px 10px;transition:border-color .2s;position:relative;overflow:hidden}
+.pcard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--pc,transparent);opacity:0;transition:opacity .2s}
+.pcard.active{border-color:var(--pc)}.pcard.active::before{opacity:1}
+.pcard.active{box-shadow:0 0 16px -4px var(--pc)}
+.p2c{text-align:right}
+.pname{font-family:var(--disp);font-size:13px;font-weight:800;color:var(--pc);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pinfo{font-size:9px;color:var(--mu);margin-top:2px;min-height:12px;line-height:1.4}
+.pbar-wrap{height:3px;background:var(--b1);border-radius:2px;margin:5px 0;overflow:hidden}
+.pbar{height:3px;border-radius:2px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.p2c .pbar{margin-left:auto}
+.pbtns{display:flex;gap:4px;flex-wrap:wrap}
+.p2c .pbtns{justify-content:flex-end}
+.abtn,.sbtn{font-family:var(--mono);font-size:9px;padding:3px 7px;border-radius:4px;border:1px solid var(--b2);background:transparent;color:var(--mu);cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+.abtn.ready{border-color:var(--gold);color:var(--gold);background:var(--gbg)}
+.sbtn:not(:disabled):hover{border-color:var(--tx);color:var(--tx)}
+.abtn:disabled,.sbtn:disabled,.sbtn.used{opacity:.28;cursor:default}
+.sbtn.used{text-decoration:line-through}
+#center-hud{display:flex;flex-direction:column;align-items:center;gap:2px}
+.rlbl{font-size:9px;color:var(--mu);letter-spacing:.1em;text-transform:uppercase}
+#rnd-val{font-family:var(--disp);font-size:20px;font-weight:800;color:var(--tx);line-height:1}
+#scores{display:flex;gap:4px;margin-top:2px}
+.chip{font-size:10px;font-weight:700;padding:1px 8px;border-radius:999px}
+.ch1{background:var(--c1bg);color:var(--c1);border:1px solid var(--c1d)}
+.ch2{background:var(--c2bg);color:var(--c2);border:1px solid var(--c2d)}
+
+/* ── petri-dish style frame around the board ── */
+#game-area{width:100%;max-width:700px;position:relative}
+#canvas-wrap{
+  position:relative;border-radius:10px;overflow:hidden;line-height:0;width:100%;
+  border:1px solid var(--b2);
+  background:
+    radial-gradient(ellipse 70% 100% at 0% 50%, rgba(61,142,240,.07), transparent 55%),
+    radial-gradient(ellipse 70% 100% at 100% 50%, rgba(232,82,82,.06), transparent 55%);
+  box-shadow:inset 0 0 30px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.02), 0 8px 30px -12px rgba(0,0,0,.8);
+  padding:3px;
+}
+canvas#c{display:block;width:100%;height:auto;cursor:crosshair;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;border-radius:8px}
+
+#overlay{display:none;position:absolute;inset:0;background:rgba(7,9,18,.93);align-items:center;justify-content:center;flex-direction:column;gap:8px;z-index:20;padding:16px;border-radius:8px}
+#overlay.show{display:flex}
+#ov-title{font-family:var(--disp);font-size:22px;font-weight:800;letter-spacing:-1px;text-align:center}
+#ov-sub{font-size:11px;color:var(--mu);letter-spacing:.05em}
+#ov-exp{max-width:300px;font-size:11px;color:var(--tx);line-height:1.75;text-align:center;padding:10px 13px;border:1px solid var(--b2);border-radius:var(--r);background:rgba(255,255,255,.03)}
+#ov-btn{font-family:var(--mono);font-size:11px;padding:7px 22px;border-radius:var(--r);border:1px solid var(--gold);background:var(--gbg);color:var(--gold);cursor:pointer;letter-spacing:.06em;transition:background .15s;-webkit-tap-highlight-color:transparent}
+#ov-btn:hover{background:rgba(200,160,32,.2)}
+
+#preview-bar{display:none;position:absolute;left:0;right:0;bottom:0;z-index:15;
+  align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;
+  background:linear-gradient(0deg,rgba(7,9,18,.96),rgba(7,9,18,.7));
+  border-top:1px solid var(--gold);backdrop-filter:blur(2px)}
+#preview-bar .pv-label{font-size:10px;color:var(--gold);letter-spacing:.06em;text-transform:uppercase}
+.pv-btns{display:flex;gap:6px}
+#pv-cancel,#pv-confirm{font-family:var(--mono);font-size:11px;padding:6px 14px;border-radius:var(--r);border:1px solid var(--b2);background:transparent;color:var(--mu);cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+#pv-cancel:hover{border-color:var(--c2);color:var(--c2)}
+#pv-confirm{border-color:var(--gold);color:var(--gold);background:var(--gbg)}
+#pv-confirm:hover{background:rgba(200,160,32,.2)}
+#bottom-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;max-width:700px;margin-top:8px}
+#msg{font-size:10px;color:var(--mu);flex:1;min-height:14px;letter-spacing:.02em}
+#msg.hl{color:var(--gold)}#msg.w1{color:var(--c1)}#msg.w2{color:var(--c2)}
+.btns{display:flex;gap:5px;flex-shrink:0}
+.gbtn{font-family:var(--mono);font-size:10px;padding:5px 12px;border-radius:var(--r);border:1px solid var(--b2);background:transparent;color:var(--mu);cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.gbtn:hover{border-color:var(--tx);color:var(--tx)}
+.gbtn.on{border-color:var(--gold);color:var(--gold);background:var(--gbg)}
+
+/* ════════════ RULES MODAL (out of board view, hidden by default) ════════════ */
+#rules-modal{display:none;position:fixed;inset:0;background:rgba(7,9,18,.92);z-index:80;align-items:center;justify-content:center;padding:18px;
+  background-image:radial-gradient(ellipse at 50% 50%, rgba(61,142,240,.04), transparent 60%)}
+#rules-modal.show{display:flex}
+#rules-box{width:100%;max-width:560px;max-height:86vh;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--sf);border:1px solid var(--b1);border-radius:12px;box-shadow:0 0 50px rgba(0,0,0,.6)}
+#rules-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--b1);position:sticky;top:0;background:var(--sf);z-index:1}
+#rules-head h2{font-family:var(--disp);font-size:15px;font-weight:800;letter-spacing:-.3px}
+#rules-close{font-family:var(--mono);font-size:18px;line-height:1;color:var(--mu);background:transparent;border:none;cursor:pointer;padding:2px 8px;-webkit-tap-highlight-color:transparent}
+#rules-close:hover{color:var(--tx)}
+#rules-content{padding:16px 18px 20px;display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+.rsec{display:flex;flex-direction:column;gap:4px}
+.rsec h3{font-family:var(--disp);font-size:10px;font-weight:800;color:var(--gold);letter-spacing:.08em;text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid var(--b1)}
+.rsec p,.rsec li{font-size:10px;color:var(--mu);line-height:1.65}
+.rsec ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:2px}
+.rsec li{padding-left:10px;position:relative}
+.rsec li::before{content:'›';position:absolute;left:0;color:var(--dim)}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.rbox{background:rgba(255,255,255,.02);border:1px solid var(--b1);border-radius:4px;padding:6px 8px}
+.rbox .rbh{font-size:9px;color:var(--tx);margin-bottom:2px;font-weight:700}
+.rbox p{font-size:9px;color:var(--mu);line-height:1.5}
+.rsec.full{grid-column:1/-1}
+.tprow{display:flex;align-items:baseline;gap:5px;font-size:9px;color:var(--mu);padding:2px 0}
+.tprow .n{color:var(--gold);flex-shrink:0;font-weight:700}
+.tprow .tag{font-size:8px;padding:1px 5px;border-radius:3px;border:1px solid var(--dim);background:rgba(255,255,255,.03);white-space:nowrap;flex-shrink:0}
+@media(max-width:480px){#rules-content{grid-template-columns:1fr}}
+/* ── in-game chat (online only) ── */
+#chat-fab{position:fixed;right:16px;bottom:16px;z-index:60;width:50px;height:50px;border-radius:50%;
+  background:var(--sf);border:1px solid var(--b2);color:var(--tx);font-size:20px;cursor:pointer;
+  display:none;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.4);
+  transition:transform .15s,border-color .15s;-webkit-tap-highlight-color:transparent}
+#chat-fab:hover{transform:scale(1.06);border-color:var(--gold)}
+#chat-fab .badge{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;border-radius:9px;
+  background:var(--c2);color:#fff;font-size:10px;font-weight:700;display:none;align-items:center;
+  justify-content:center;padding:0 5px;font-family:var(--mono)}
+#chat-panel{position:fixed;right:16px;bottom:16px;z-index:61;width:300px;max-width:calc(100vw - 32px);
+  height:380px;max-height:70vh;background:var(--bg);border:1px solid var(--b2);border-radius:12px;
+  display:none;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#chat-panel.open{display:flex}
+#chat-head{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--b1);
+  background:var(--sf)}
+#chat-head .ct{font-family:var(--disp);font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--tx);flex:1}
+#chat-head .cclose{background:none;border:none;color:var(--mu);font-size:16px;cursor:pointer;padding:2px 6px;line-height:1}
+#chat-head .cclose:hover{color:var(--tx)}
+#chat-log{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:7px}
+#chat-log .cempty{color:var(--mu);font-size:11px;text-align:center;margin:auto;padding:0 20px;line-height:1.6}
+.cmsg{max-width:82%;padding:6px 10px;border-radius:10px;font-size:12px;line-height:1.4;word-wrap:break-word}
+.cmsg .cn{font-size:9px;letter-spacing:.04em;opacity:.75;display:block;margin-bottom:2px;font-weight:700}
+.cmsg.me{align-self:flex-end;background:var(--c1bg);border:1px solid var(--c1d);color:var(--tx)}
+.cmsg.them{align-self:flex-start;background:var(--sf);border:1px solid var(--b1);color:var(--tx)}
+.cmsg.me .cn{color:var(--c1)}
+.cmsg.them .cn{color:var(--c2)}
+.cmsg.sys{align-self:center;background:none;border:none;color:var(--mu);font-size:10px;font-style:italic;padding:2px}
+#chat-input-row{display:flex;gap:6px;padding:10px;border-top:1px solid var(--b1);background:var(--sf)}
+#chat-text{flex:1;background:var(--bg);border:1px solid var(--b1);border-radius:6px;color:var(--tx);
+  font-family:var(--mono);font-size:12px;padding:8px 10px;outline:none;transition:border-color .15s}
+#chat-text:focus{border-color:var(--c1d)}
+#chat-send{background:var(--gbg);border:1px solid rgba(200,160,32,.35);border-radius:6px;color:var(--gold);
+  font-family:var(--mono);font-size:13px;padding:0 12px;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent}
+#chat-send:hover{background:rgba(200,160,32,.2)}
+@media(max-width:560px){#chat-panel{width:calc(100vw - 24px);right:12px;bottom:12px;height:60vh}#chat-fab{right:12px;bottom:12px}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><a href="/conquerors/" style="color:inherit;text-decoration:none" title="Volver al inicio">Conway's <span>Conquerors</span></a></h1>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button id="mute-btn" class="mute-btn" onclick="toggleMute()" title="Toggle sound">🔊</button>
+    <span class="ver">v5.3</span>
+  </div>
+</header>
+
+<!-- ════════════ TUTORIAL ════════════ -->
+<div id="tutorial">
+  <button id="tut-skip-top" onclick="closeTutorial()">Skip ✗</button>
+  <div id="tut-box">
+    <canvas id="tut-canvas" width="440" height="200"></canvas>
+    <div id="tut-body">
+      <div id="tut-title">—</div>
+      <div id="tut-text">—</div>
+    </div>
+    <div id="tut-nav">
+      <span id="tut-counter">1/5</span>
+      <div class="tut-btns">
+        <button class="tbtn" id="tut-prev" onclick="tutPrev()">← Back</button>
+        <button class="tbtn primary" id="tut-next" onclick="tutNext()">Next →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ LOBBY ════════════ -->
+<div id="lobby">
+  <div id="lobby-box">
+    <div id="lobby-title">Conway's <span>Conquerors</span></div>
+    <div id="lobby-sub">Enter your name to begin</div>
+    <div class="field">
+      <label for="p1name">Your name</label>
+      <input type="text" id="p1name" placeholder="Blue" maxlength="16" autocomplete="off" oninput="checkName()"/>
+      <div id="name-status" style="font-size:11px;margin-top:5px;min-height:15px;letter-spacing:.02em"></div>
+      <div style="font-size:10px;margin-top:2px">
+        <a href="#" onclick="showPlayerCode();return false;" style="color:var(--mu);text-decoration:underline">my player code (sync / backup)</a>
+      </div>
+    </div>
+    <div class="field">
+      <label for="mode-select">Game mode</label>
+      <select id="mode-select" onchange="updateLobbyUI()">
+        <option value="local">Practice — sandbox with tips (1 device)</option>
+        <option value="cpu">vs CPU</option>
+        <option value="host-public">Host public game (anyone can join)</option>
+        <option value="host">Host private game (code only)</option>
+        <option value="browse">Browse public games</option>
+        <option value="join">Join with a code</option>
+      </select>
+    </div>
+    <div class="field" id="p2name-row">
+      <label for="p2name">Opponent name</label>
+      <input type="text" id="p2name" placeholder="Red" maxlength="16" autocomplete="off"/>
+    </div>
+    <div class="field" id="diff-row2" style="display:none">
+      <label for="diff-select">CPU difficulty</label>
+      <select id="diff-select">
+        <option value="easy">Easy</option>
+        <option value="normal" selected>Normal</option>
+        <option value="hard">Hard</option>
+      </select>
+    </div>
+    <div class="field" id="join-room-row" style="display:none">
+      <label for="room-code-input">Room code</label>
+      <input type="text" id="room-code-input" placeholder="abc123" maxlength="8" autocomplete="off"/>
+    </div>
+
+    <div class="field" id="browse-row" style="display:none">
+      <label>Public games <span id="browse-count" style="color:var(--mu)"></span></label>
+      <div id="lobby-list"></div>
+      <div id="lobby-empty" style="font-size:11px;color:var(--mu);padding:10px 2px">Looking for open games…</div>
+    </div>
+
+    <div class="field" id="guided-row">
+      <label class="check-label" for="guided-check">
+        <input type="checkbox" id="guided-check"/>
+        <span><strong>Guided mode</strong> — preview each evolution before it happens</span>
+      </label>
+    </div>
+    <button class="launch-btn" onclick="launchGame()">Start Game</button>
+    <div id="online-waiting">
+      <div class="ws-label">Share this room code with your opponent:</div>
+      <div id="online-room-display">—</div>
+      <div id="online-status"></div>
+      <div id="online-hint">They open the same URL and choose "Join online game"</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════ GAME UI ════════════ -->
+<div id="game-ui">
+  <div id="hud">
+    <div class="pcard" id="pc1" style="--pc:var(--c1)">
+      <div class="pname" id="name1-hud">Blue</div>
+      <div class="pinfo" id="pi1"></div>
+      <div class="pbar-wrap"><div class="pbar" id="pb1" style="background:var(--c1);width:50%"></div></div>
+      <div class="pbtns">
+        <button class="abtn" id="ab1" onclick="useAbility(1)">Bomb</button>
+        <button class="sbtn" id="skip1" onclick="skipTurnFor(1)">Skip</button>
+      </div>
+    </div>
+    <div id="center-hud">
+      <span class="rlbl">round</span>
+      <div id="rnd-val">1/12</div>
+      <div id="scores"><span class="chip ch1" id="s1">0</span><span class="chip ch2" id="s2">0</span></div>
+    </div>
+    <div class="pcard p2c" id="pc2" style="--pc:var(--c2)">
+      <div class="pname" id="name2-hud">Red</div>
+      <div class="pinfo" id="pi2"></div>
+      <div class="pbar-wrap"><div class="pbar" id="pb2" style="background:var(--c2);width:50%;margin-left:auto"></div></div>
+      <div class="pbtns p2c">
+        <button class="sbtn" id="skip2" onclick="skipTurnFor(2)">Skip</button>
+        <button class="abtn" id="ab2" onclick="useAbility(2)">Bomb</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="game-area">
+    <div id="canvas-wrap">
+      <canvas id="c"></canvas>
+      <div id="overlay">
+        <div id="ov-title">—</div>
+        <div id="ov-sub">—</div>
+        <div id="ov-exp"></div>
+        <button id="ov-btn" onclick="resetGame()">Play again</button>
+      </div>
+      <div id="preview-bar">
+        <span class="pv-label">Next evolution preview</span>
+        <div class="pv-btns">
+          <button id="pv-cancel" onclick="cancelPreview()">✗ Cancel</button>
+          <button id="pv-confirm" onclick="confirmPreview()">✓ Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom-bar">
+    <div id="msg">Loading…</div>
+    <div class="btns">
+      <button id="rules-toggle-btn" class="gbtn" onclick="openRules()">Rules</button>
+      <button class="gbtn" onclick="resetGame()">Restart</button>
+    </div>
+  </div>
+</div><!-- /game-ui -->
+
+<!-- ════════════ IN-GAME CHAT (online only) ════════════ -->
+<button id="chat-fab" onclick="toggleChat()" aria-label="Chat">
+  💬<span class="badge" id="chat-badge">0</span>
+</button>
+<div id="chat-panel" role="dialog" aria-label="Game chat">
+  <div id="chat-head">
+    <span class="ct" id="chat-title">Chat</span>
+    <button class="cclose" onclick="toggleChat()" aria-label="Close chat">✕</button>
+  </div>
+  <div id="chat-log">
+    <div class="cempty" id="chat-empty">Say hi to your opponent. Messages are only visible to the two of you, during this match.</div>
+  </div>
+  <div id="chat-input-row">
+    <input type="text" id="chat-text" maxlength="200" autocomplete="off"
+      placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendChat()"/>
+    <button id="chat-send" onclick="sendChat()" aria-label="Send">➤</button>
+  </div>
+</div>
+
+
+<!-- ════════════ RULES MODAL ════════════ -->
+<div id="rules-modal">
+  <div id="rules-box">
+    <div id="rules-head">
+      <h2>How to play</h2>
+      <button id="rules-close" onclick="closeRules()">✕</button>
+    </div>
+    <div id="rules-content">
+      <div class="rsec">
+        <h3>Objective</h3>
+        <p>Wipe out the enemy colony, or hold more cells by round 12.</p>
+      </div>
+      <div class="rsec">
+        <h3>Your turn</h3>
+        <ul>
+          <li>Place <strong>4 cells</strong> per turn.</li>
+          <li>After your 4th, the board <strong>evolves</strong>.</li>
+          <li><strong>Skip</strong> works <strong>once</strong> per game.</li>
+        </ul>
+      </div>
+      <div class="rsec full">
+        <h3>Territory access</h3>
+        <div class="tprow"><span class="n">①</span><span class="tag">Home only</span><span>always available</span></div>
+        <div class="tprow"><span class="n">②</span><span class="tag">+ Neutral</span><span>need cells in your home zone</span></div>
+        <div class="tprow"><span class="n">③</span><span class="tag">+ Enemy zone</span><span>need cells in neutral <em>and</em> a live cell already in enemy territory</span></div>
+      </div>
+      <div class="rsec full">
+        <h3>Conway's rules</h3>
+        <div class="rgrid">
+          <div class="rbox"><div class="rbh">💀 Loneliness</div><p>&lt; 2 neighbors → dies</p></div>
+          <div class="rbox"><div class="rbh">💀 Overcrowding</div><p>&gt; 3 neighbors → dies</p></div>
+          <div class="rbox"><div class="rbh">✅ Survival</div><p>2–3 neighbors → lives</p></div>
+          <div class="rbox"><div class="rbh">🟢 Birth</div><p>Empty + 3 neighbors → born in majority color</p></div>
+        </div>
+      </div>
+      <div class="rsec">
+        <h3>Bomb</h3>
+        <ul>
+          <li>Destroys a <strong>3×3 area</strong>.</li>
+          <li>Unlocks at <strong>round 7</strong> (mid-game).</li>
+          <li>Using it <strong>ends your turn</strong>.</li>
+          <li><strong>3-turn</strong> cooldown.</li>
+        </ul>
+      </div>
+      <div class="rsec">
+        <h3>Tips</h3>
+        <ul>
+          <li>Groups of 2–3 survive best.</li>
+          <li>Reach neutral early.</li>
+          <li>Save your skip for a key moment.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="game.js?v=60"></script>
+<script>
+if('serviceWorker' in navigator){
+  addEventListener('load',()=>navigator.serviceWorker.register('sw.js',{scope:'/play/'}).catch(()=>{}));
+}
+</script>
+<script>
+function openRules(){document.getElementById('rules-modal').classList.add('show');}
+function closeRules(){document.getElementById('rules-modal').classList.remove('show');}
+// close modal on backdrop click
+document.getElementById('rules-modal').addEventListener('click',function(e){
+  if(e.target===this) closeRules();
+});
+</script>
+</body>
+</html>

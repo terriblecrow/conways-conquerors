@@ -1,0 +1,22 @@
+# /etc/nginx/sites-available/conways
+# Proxy hacia el server Node (puerto 3000) con soporte WebSocket.
+# Reemplazá tudominio.com por tu dominio o la IP del VPS.
+
+server {
+    listen 80;
+    server_name tudominio.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+
+        # Imprescindible para el multijugador (WebSocket):
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;   # partidas largas sin cortes
+    }
+}

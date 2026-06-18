@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <title>terrible crow</title>
+    <meta name="description" content="terrible crow — a small game studio. one game out: Conway's Conquerors. others in the dark."/>
+    <meta property="og:title" content="terrible crow"/>
+    <meta property="og:description" content="a small game studio. one game out. others in the dark."/>
+    <meta property="og:type" content="website"/>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+    <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+    :root {
+        --bg: #08070d; --sf: #0d0b13; --sf2: #110e1a; --b1: #1d1929; --b2: #2a2440;
+        --vi: #8b5cf6; --vidim: #54448c; --vibg: rgba(139, 92, 246, .07);
+        --te: #3fd8c8; --gold: #c8a020; --c1: #3d8ef0; --c2: #e85252;
+        --tx: #dcd7e8; --mu: #6e6885; --dim: #3d3852;
+        --disp: 'Unbounded', sans-serif; --mono: 'Space Mono', monospace;
+    }
+    html { scroll-behavior: smooth }
+    @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto }
+        * { animation-duration: .001s !important; transition-duration: .001s !important }
+    }
+    body {
+        background: var(--bg); color: var(--tx); font-family: var(--mono);
+        font-size: 13px; line-height: 1.75; -webkit-font-smoothing: antialiased;
+        background-image:
+        radial-gradient(ellipse 50% 40% at 80% -5%, rgba(139, 92, 246, .05), transparent 65%),
+        linear-gradient(rgba(255, 255, 255, .008) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .008) 1px, transparent 1px);
+        background-size: 100% 100%, 26px 26px, 26px 26px;
+    }
+    a { color: inherit }
+    ::selection { background: var(--vi); color: #08070d }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 0 24px }
+    /* ── nav ── */
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+        border-bottom: 1px solid rgba(29, 25, 41, .8);
+        background: rgba(8, 7, 13, .88); backdrop-filter: blur(8px) }
+    nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 52px }
+    .logo { font-family: var(--disp); font-weight: 700; font-size: 12px; letter-spacing: .06em;
+        text-decoration: none; display: flex; align-items: center; gap: 10px }
+    .logo .crow-mini { width: 18px; height: 18px; image-rendering: pixelated }
+    .logo b { color: var(--vi); font-weight: 700 }
+    .nav-links { display: flex; align-items: center; gap: 20px; font-size: 11px }
+    .nav-links a { color: var(--mu); text-decoration: none; letter-spacing: .04em; transition: color .15s }
+    .nav-links a:hover { color: var(--tx) }
+    .lang-toggle { display: flex; border: 1px solid var(--b1); border-radius: 4px; overflow: hidden }
+    .lang-toggle button { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .06em;
+        padding: 5px 9px; background: transparent; border: none; color: var(--mu); cursor: pointer; transition: all .15s }
+    .lang-toggle button.on { background: var(--vibg); color: var(--vi) }
+    .lang-toggle button:not(.on):hover { color: var(--tx) }
+    @media (max-width: 560px) { .nav-links a { display: none } }
+    /* ── hero ── */
+    #hero { min-height: 78vh; display: flex; align-items: center; border-bottom: 1px solid var(--b1); position: relative }
+    .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 50px; align-items: center; width: 100%; padding: 110px 0 60px }
+    @media (max-width: 740px) { .hero-grid { grid-template-columns: 1fr; gap: 26px } }
+    .ix { font-size: 10px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; display: block; margin-bottom: 18px }
+    .ix em { font-style: normal; color: var(--vi) }
+    h1.studio { font-family: var(--disp); font-weight: 900; font-size: clamp(30px, 5.6vw, 52px);
+        line-height: 1.06; letter-spacing: -.5px; margin-bottom: 22px; text-transform: lowercase }
+    h1.studio b { color: var(--vi); font-weight: 900 }
+    .studio-line { color: var(--mu); font-size: 13.5px; max-width: 420px; margin-bottom: 30px }
+    .studio-line b { color: var(--tx); font-weight: 400 }
+    .quiet-link { font-size: 12px; color: var(--te); text-decoration: none; letter-spacing: .03em;
+        border-bottom: 1px solid rgba(63, 216, 200, .3); padding-bottom: 2px; transition: border-color .15s }
+    .quiet-link:hover { border-color: var(--te) }
+    #crow { width: 100%; max-width: 340px; aspect-ratio: 10/9; cursor: pointer; display: block; margin: 0 auto }
+    .crow-cap { display: block; text-align: center; font-size: 10px; color: var(--dim); letter-spacing: .06em; margin-top: 8px }
+    /* ── sections ── */
+    section { padding: 78px 0; border-bottom: 1px solid var(--b1) }
+    .sec-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 36px }
+    .sec-num { font-family: var(--disp); font-weight: 400; font-size: 11px; color: var(--vidim); letter-spacing: .1em }
+    h2 { font-family: var(--disp); font-weight: 700; font-size: clamp(17px, 2.6vw, 22px); letter-spacing: .02em; text-transform: lowercase }
+    /* ── roster ── */
+    .roster { border: 1px solid var(--b1); border-radius: 10px; overflow: hidden; background: var(--sf) }
+    .r-row { display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: baseline;
+        padding: 16px 20px; border-top: 1px solid var(--b1); font-size: 12px; transition: background .15s }
+    .r-row:first-child { border-top: none }
+    .r-row:hover { background: var(--sf2) }
+    .r-num { font-family: var(--disp); font-size: 11px; color: var(--vidim) }
+    .r-name { color: var(--tx) }
+    .r-name small { display: block; color: var(--mu); font-size: 11px; margin-top: 1px }
+    .r-status { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap }
+    .r-status.live { color: var(--te) }
+    .r-status.dark { color: var(--mu) }
+    .r-status.egg { color: var(--dim) }
+    /* expanded first entry */
+    .r-detail { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--b1); background: #070912 }
+    @media (max-width: 700px) { .r-detail { grid-template-columns: 1fr } }
+    .r-sim-wrap { position: relative; min-height: 230px; border-right: 1px solid var(--b1) }
+    @media (max-width: 700px) { .r-sim-wrap { border-right: none; border-bottom: 1px solid var(--b1) } }
+    #gamesim { position: absolute; inset: 0; width: 100%; height: 100%; display: block }
+    .sim-tag { position: absolute; bottom: 10px; left: 12px; font-size: 9px; letter-spacing: .12em;
+        color: var(--gold); text-transform: uppercase; background: rgba(7, 9, 18, .85);
+        border: 1px solid rgba(200, 160, 32, .35); border-radius: 999px; padding: 2px 9px }
+    .r-body { padding: 26px 24px }
+    .r-title { font-family: var(--disp); font-weight: 900; font-size: 17px; letter-spacing: .01em; margin-bottom: 10px }
+    .r-title em { font-style: normal; color: var(--c1) }
+    .r-title strong { color: var(--c2) }
+    .r-body p { font-size: 12px; color: var(--mu); margin-bottom: 18px }
+    .r-body p b { color: var(--tx); font-weight: 400 }
+    .r-links { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px }
+    .r-links a { text-decoration: none; letter-spacing: .03em; border-bottom: 1px solid; padding-bottom: 2px; transition: opacity .15s }
+    .r-links a:hover { opacity: .75 }
+    .r-links .play { color: var(--gold); border-color: rgba(200, 160, 32, .4) }
+    .r-links .page { color: var(--mu); border-color: var(--b2) }
+    .r-meta { display: flex; gap: 14px; margin-top: 20px; font-size: 10px; color: var(--dim); letter-spacing: .06em; flex-wrap: wrap }
+    /* ── notes ── */
+    .notes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;
+        border: 1px solid var(--b1); border-radius: 10px; overflow: hidden; background: var(--sf) }
+    @media (max-width: 700px) { .notes { grid-template-columns: 1fr } }
+    .note { padding: 22px 22px 20px; border-top: 1px solid var(--b1); border-left: 1px solid var(--b1);
+        font-size: 12px; color: var(--mu); position: relative }
+    .note:nth-child(-n + 2) { border-top: none }
+    .note:nth-child(odd) { border-left: none }
+    @media (max-width: 700px) {
+        .note { border-left: none }
+        .note:nth-child(2) { border-top: 1px solid var(--b1) }
+    }
+    .note b { color: var(--tx); font-weight: 400 }
+    .note .n { font-family: var(--disp); font-size: 10px; color: var(--vidim); display: block; margin-bottom: 8px; letter-spacing: .1em }
+    .note .sig { color: var(--te) }
+    /* ── contact ── */
+    #contact { padding: 78px 0; border-bottom: 1px solid var(--b1) }
+    .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start }
+    @media (max-width: 700px) { .contact-grid { grid-template-columns: 1fr } }
+    .contact-aside { font-size: 12px; color: var(--mu); padding-top: 4px }
+    .contact-aside p { margin-bottom: 16px; line-height: 1.9 }
+    .contact-aside b { color: var(--tx); font-weight: 400 }
+    .contact-mail { display: inline-flex; align-items: center; gap: 8px; font-size: 11px;
+        color: var(--te); text-decoration: none; letter-spacing: .04em;
+        border-bottom: 1px solid rgba(63, 216, 200, .3); padding-bottom: 2px;
+        transition: border-color .15s }
+    .contact-mail:hover { border-color: var(--te) }
+    .contact-form { background: var(--sf); border: 1px solid var(--b1); border-radius: 10px; overflow: hidden }
+    .cf-field { padding: 0 }
+    .cf-field label { display: block; font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+        color: var(--vidim); padding: 14px 20px 0; font-family: var(--disp) }
+    .cf-field textarea {
+        display: block; width: 100%; background: transparent; border: none;
+        border-bottom: 1px solid var(--b1); color: var(--tx); font-family: var(--mono);
+        font-size: 12px; line-height: 1.7; padding: 10px 20px 14px; resize: none;
+        outline: none; transition: border-color .2s; min-height: 130px }
+    .cf-field textarea::placeholder { color: var(--dim) }
+    .cf-field textarea:focus { border-color: var(--vidim) }
+    .cf-field input[type="email"] {
+        display: block; width: 100%; background: transparent; border: none;
+        border-bottom: 1px solid var(--b1); color: var(--tx); font-family: var(--mono);
+        font-size: 12px; padding: 10px 20px 14px; outline: none; transition: border-color .2s }
+    .cf-field input[type="email"]::placeholder { color: var(--dim) }
+    .cf-field input[type="email"]:focus { border-color: var(--vidim) }
+    .cf-footer { display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 20px; flex-wrap: wrap; gap: 10px }
+    .cf-hint { font-size: 10px; color: var(--dim); letter-spacing: .06em }
+    .cf-send { font-family: var(--mono); font-size: 11px; letter-spacing: .1em;
+        text-transform: uppercase; background: var(--vibg); color: var(--vi);
+        border: 1px solid rgba(139, 92, 246, .3); border-radius: 5px;
+        padding: 8px 18px; cursor: pointer; transition: all .2s }
+    .cf-send:hover { background: rgba(139, 92, 246, .15); border-color: var(--vi) }
+    .cf-send:active { transform: scale(.97) }
+    .cf-status { font-size: 11px; padding: 0 20px 14px; min-height: 20px; color: var(--te); letter-spacing: .04em }
+    /* ── colophon footer ── */
+    footer { padding: 42px 0 50px; font-size: 11px; color: var(--mu) }
+    footer .wrap { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px }
+    @media (max-width: 700px) { footer .wrap { grid-template-columns: 1fr } }
+    footer h4 { font-family: var(--disp); font-size: 10px; font-weight: 700; letter-spacing: .14em;
+        text-transform: uppercase; color: var(--dim); margin-bottom: 10px }
+    footer p { font-size: 11px; line-height: 1.8 }
+    footer a { color: var(--mu); text-decoration: none; border-bottom: 1px solid var(--b1) }
+    footer a:hover { color: var(--tx) }
+    .rv { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease }
+    .rv.in { opacity: 1; transform: none }
+    @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none } }
+    :focus-visible { outline: 2px solid var(--vi); outline-offset: 2px; border-radius: 3px }
+    /* ── easter egg tooltip ── */
+    #ee-hint {
+        position: fixed; bottom: 28px; right: 28px; z-index: 100;
+        font-size: 10px; letter-spacing: .08em; color: var(--te);
+        background: rgba(8, 7, 13, .92); border: 1px solid rgba(63, 216, 200, .25);
+        border-radius: 6px; padding: 7px 14px;
+        opacity: 0; pointer-events: none;
+        transition: opacity .4s ease;
+    }
+    #ee-hint.show { opacity: 1 }
+    </style>
+</head>
+<body>
+
+    <!-- easter egg hint -->
+    <div id="ee-hint">the crow saw you.</div>
+
+    <nav>
+        <div class="wrap">
+            <a class="logo" href="#hero">
+                <img class="crow-mini" src="favicon.svg" alt="" width="18" height="18"/>
+                terrible <b>crow</b>
+            </a>
+            <div class="nav-links">
+                <a href="#roster" data-i18n="nav_roster"></a>
+                <a href="#notes" data-i18n="nav_notes"></a>
+                <a href="#contact" data-i18n="nav_contact"></a>
+                <div class="lang-toggle" role="group" aria-label="Language / Idioma">
+                    <button id="lang-es" onclick="setLang('es')">ES</button>
+                    <button id="lang-en" onclick="setLang('en')">EN</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header id="hero">
+        <div class="wrap hero-grid">
+            <div>
+                <span class="ix" data-i18n="hero_ix"></span>
+                <h1 class="studio">terrible <b>crow</b></h1>
+                <p class="studio-line" data-i18n="hero_line"></p>
+                <a class="quiet-link" href="/conquerors/" data-i18n="hero_link"></a>
+            </div>
+            <div>
+                <canvas id="crow" aria-label="pixel crow assembled from cells"></canvas>
+                <span class="crow-cap" data-i18n="crow_cap"></span>
+            </div>
+        </div>
+    </header>
+
+    <section id="roster">
+        <div class="wrap">
+            <div class="sec-head rv">
+                <span class="sec-num">§1</span>
+                <h2 data-i18n="roster_h2"></h2>
+            </div>
+            <div class="roster rv">
+                <div class="r-row">
+                    <span class="r-num">001</span>
+                    <span class="r-name">
+                        conway's conquerors
+                        <small data-i18n="r1_sub"></small>
+                    </span>
+                    <span class="r-status live" data-i18n="st_live"></span>
+                </div>
+                <div class="r-detail">
+                    <div class="r-sim-wrap">
+                        <canvas id="gamesim" aria-label="live Conway's Game of Life battle"></canvas>
+                        <span class="sim-tag" data-i18n="sim_tag"></span>
+                    </div>
+                    <div class="r-body">
+                        <div class="r-title">CONWAY'S <em>CONQUE</em><strong>RORS</strong></div>
+                        <p data-i18n="r1_desc"></p>
+                        <div class="r-links">
+                            <a class="play" href="/play/" data-i18n="r1_play"></a>
+                            <a class="page" href="/conquerors/" data-i18n="r1_page"></a>
+                        </div>
+                        <div class="r-meta">
+                            <span data-i18n="r1_m1"></span>
+                            <span data-i18n="r1_m2"></span>
+                            <span data-i18n="r1_m3"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="r-row">
+                    <span class="r-num">002</span>
+                    <span class="r-name" data-i18n="r2_name"></span>
+                    <span class="r-status dark" data-i18n="st_dark"></span>
+                </div>
+                <div class="r-row">
+                    <span class="r-num">003</span>
+                    <span class="r-name" data-i18n="r3_name"></span>
+                    <span class="r-status egg" data-i18n="st_egg"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="notes">
+        <div class="wrap">
+            <div class="sec-head rv">
+                <span class="sec-num">§2</span>
+                <h2 data-i18n="notes_h2"></h2>
+            </div>
+            <div class="notes rv">
+                <div class="note"><span class="n">n.01</span><span data-i18n="n1"></span></div>
+                <div class="note"><span class="n">n.02</span><span data-i18n="n2"></span></div>
+                <div class="note"><span class="n">n.03</span><span data-i18n="n3"></span></div>
+                <div class="note"><span class="n">n.04</span><span data-i18n="n4"></span></div>
+                <div class="note"><span class="n">n.05</span><span data-i18n="n5"></span></div>
+                <div class="note"><span class="n">n.06</span><span data-i18n="n6"></span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── §3 contact ── -->
+    <section id="contact">
+        <div class="wrap">
+            <div class="sec-head rv">
+                <span class="sec-num">§3</span>
+                <h2 data-i18n="contact_h2"></h2>
+            </div>
+            <div class="contact-grid rv">
+                <div class="contact-aside">
+                    <p data-i18n="contact_aside"></p>
+                    <a class="contact-mail" href="mailto:contact@terriblecrow.com">
+                        contact@terriblecrow.com
+                    </a>
+                </div>
+                <div class="contact-form">
+                    <div class="cf-field">
+                        <label data-i18n="cf_label_msg"></label>
+                        <textarea id="cf-msg" rows="5" data-i18n-ph="cf_ph_msg" placeholder=""></textarea>
+                    </div>
+                    <div class="cf-field">
+                        <label data-i18n="cf_label_mail"></label>
+                        <input type="email" id="cf-email" data-i18n-ph="cf_ph_mail" placeholder=""/>
+                    </div>
+                    <div class="cf-footer">
+                        <span class="cf-hint" data-i18n="cf_hint"></span>
+                        <button class="cf-send" id="cf-btn" data-i18n="cf_send"></button>
+                    </div>
+                    <div class="cf-status" id="cf-status" aria-live="polite"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="wrap">
+            <div>
+                <h4>terrible crow</h4>
+                <p data-i18n="f_about"></p>
+            </div>
+            <div>
+                <h4 data-i18n="f_col_h"></h4>
+                <p data-i18n="f_col"></p>
+            </div>
+            <div>
+                <h4 data-i18n="f_nav_h"></h4>
+                <p>
+                    <a href="/play/" data-i18n="f_play"></a><br/>
+                    <a href="/conquerors/">conway's conquerors</a><br/>
+                    <a href="#notes" data-i18n="f_notes"></a><br/>
+                    <a href="#contact" data-i18n="f_contact"></a>
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+    /* ════════ i18n ════════ */
+    const I18N = {
+        en: {
+            _title: 'terrible crow',
+            nav_roster: 'roster',
+            nav_notes: 'notes',
+            nav_contact: 'contact',
+            hero_ix: 'a small game studio · est. <em>2026</em>',
+            hero_line: 'I program slow-paced video games based on my solitary thoughts, one is out. /<b>Small rules can have long consequences</b>',
+            hero_link: 'play conway\'s conquerors →',
+            crow_cap: '142 cells. click to reassemble.',
+            roster_h2: 'roster',
+            st_live: 'live',
+            st_dark: 'I like rain...',
+            st_egg: 'LEAVE ME ALONE',
+            r1_sub: 'strategy · cellular automaton · 1v1',
+            sim_tag: 'live simulation',
+            r1_desc: 'two colonies on one board ruled by <b>Conway\'s Game of Life</b>. you place four cells per turn; the board takes it from there. extinction or majority by round twelve. plays in the browser — practice sandbox, three CPUs, or online against anyone with the room code.',
+            r1_play: 'play →',
+            r1_page: 'game page',
+            r1_m1: 'free',
+            r1_m2: 'no account',
+            r1_m3: '~2 min to learn',
+            r2_name: '%Temporary lost of inform4t1on% — something about memory, and what crows do with it',
+            r3_name: '—',
+            notes_h2: 'field notes',
+            n1: 'the game of life was invented by <b>John H. Conway in 1970</b>, played by hand with stones on a go board. he later said he grew to hate it for overshadowing everything else he did. we respectfully disagree with him.',
+            n2: 'life is <b>Turing-complete</b>: with enough patience you can build a working computer out of gliders and still-lifes. people have. it is very slow and completely useless, which is part of the charm.',
+            n3: 'real crows <b>recognize human faces for years</b> and teach their offspring which ones to distrust. they also hold what look like funerals. we found this an acceptable mascot for competitive games.',
+            n4: 'the backend of this entire site is <b>one file</b>. the websocket protocol is written by hand, no libraries. when a hosting proxy eats the websocket, the game quietly switches to long-polling and nobody notices. that took a while.',
+            n5: 'there are <b>no ads, no analytics, no cookies</b> here. the only thing stored in your browser is your language and whether you muted the sound.',
+            n6: 'the studio ships when something is <span class="sig">done</span>, which is a word we use carefully. 002 exists on paper and in one ugly prototype. 003 is, at the moment of writing, a feeling.',
+            contact_h2: 'contact',
+            contact_aside: 'something to say? a bug, a thought? — it all goes to the same place. <b>no account needed</b>. Or just mail me...',
+            cf_label_msg: 'message',
+            cf_ph_msg: 'tell me...',
+            cf_label_mail: 'your email (optional)',
+            cf_ph_mail: 'only if you want a reply',
+            cf_hint: '',
+            cf_send: 'send →',
+            cf_ok: 'message sent. The crow looks intrigued.',
+            cf_err: 'something went wrong. try the mail link instead.',
+            cf_empty: 'write something first.',
+            f_about: 'strategy games with small rules and long consequences. built slowly, in the dark, mostly at night.',
+            f_col_h: 'colophon',
+            f_col: 'set in Unbounded and Space Mono. rendered by your browser, served by a single node process. the crow above is made of the same cells the game is, and hides a secret.',
+            f_nav_h: 'index',
+            f_play: 'play',
+            f_notes: 'field notes',
+            f_contact: 'contact',
+        },
+        es: {
+            _title: 'terrible crow',
+            nav_roster: 'catálogo',
+            nav_notes: 'notas',
+            nav_contact: 'contacto',
+            hero_ix: 'un pequeño estudio de juegos · est. <em>2026</em>',
+            hero_line: 'Hago juegos lentos y reflexivos. uno ya salió. <b>A veces el menor movimiento puede provocar el más grande de los cambios</b>',
+            hero_link: 'jugar conway\'s conquerors →',
+            crow_cap: '142 células. clic para re-ensamblar.',
+            roster_h2: 'catálogo',
+            st_live: 'en vivo',
+            st_dark: 'Creo que algo está muriendo',
+            st_egg: 'Déjenme en paz...',
+            r1_sub: 'estrategia · autómata celular · 1v1',
+            sim_tag: 'simulación en vivo',
+            r1_desc: 'dos colonias en un tablero regido por el <b>Juego de la Vida de Conway</b>. colocás cuatro células por turno; el tablero sigue solo. extinción o mayoría en la ronda doce. corre en el navegador — sandbox de práctica, tres CPUs, u online contra cualquiera con el código de sala.',
+            r1_play: 'jugar →',
+            r1_page: 'página del juego',
+            r1_m1: 'gratis',
+            r1_m2: 'sin cuenta',
+            r1_m3: '~2 min para aprender',
+            r2_name: 'Leí algo sobre la memoria, y lo que los cuervos hacen con ella',
+            r3_name: '—',
+            notes_h2: 'notas de campo',
+            n1: 'el juego de la vida lo inventó <b>John H. Conway en 1970</b>, jugándolo a mano con piedras sobre un tablero de go. después dijo que llegó a odiarlo porque eclipsó todo lo demás que hizo. respetuosamente, no estamos de acuerdo.',
+            n2: 'life es <b>Turing-completo</b>: con suficiente paciencia se puede construir una computadora funcional con planeadores y naturalezas muertas. hay gente que lo hizo. es lentísima y completamente inútil, que es parte del encanto.',
+            n3: 'los cuervos reales <b>reconocen caras humanas durante años</b> y les enseñan a sus crías de quién desconfiar. también hacen algo que parece un funeral. nos pareció una mascota aceptable para juegos competitivos.',
+            n4: 'el backend de todo este sitio es <b>un solo archivo</b>. el protocolo websocket está escrito a mano, sin librerías. cuando el proxy de un hosting se come el websocket, el juego cambia en silencio a long-polling y nadie lo nota. eso llevó un rato.',
+            n5: 'acá <b>no hay publicidad, ni analytics, ni cookies</b>. lo único que se guarda en tu navegador es tu idioma y si silenciaste el sonido.',
+            n6: 'el estudio publica cuando algo está <span class="sig">terminado</span>, una palabra que usamos con cuidado. el 002 existe en papel y en un prototipo feo. el 003 es, al momento de escribir esto, una sensación.',
+            contact_h2: 'contacto',
+            contact_aside: '¿algo que decir? un bug, una idea?. <b>sin cuenta</b>, o simplemente mandame un mail.',
+            cf_label_msg: 'mensaje',
+            cf_ph_msg: 'en que pensas...',
+            cf_label_mail: 'tu email (opcional)',
+            cf_ph_mail: 'solo si querés respuesta',
+            cf_hint: '',
+            cf_send: 'enviar →',
+            cf_ok: 'mensaje enviado. el cuervo se muestra intrigado.',
+            cf_err: 'algo salió mal. probá el link de mail.',
+            cf_empty: 'escribí algo primero.',
+            f_about: 'juegos de estrategia con reglas chicas y consecuencias largas. construidos despacio, mayormente de noche.',
+            f_col_h: 'colofón',
+            f_col: 'compuesto en Unbounded y Space Mono. renderizado por tu navegador. El cuervo de arriba está hecho de las mismas células que el juego... y dicen que esconde un secreto.',
+            f_nav_h: 'índice',
+            f_play: 'jugar',
+            f_notes: 'notas de campo',
+            f_contact: 'contacto',
+        }
+    };
+
+    function setLang(lang) {
+        if (!I18N[lang]) lang = 'en';
+        const d = I18N[lang];
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const k = el.dataset.i18n;
+            if (d[k] != null) el.innerHTML = d[k];
+        });
+        document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+            const k = el.dataset.i18nPh;
+            if (d[k] != null) el.placeholder = d[k];
+        });
+        document.documentElement.lang = lang;
+        document.title = d._title;
+        document.getElementById('lang-es').classList.toggle('on', lang === 'es');
+        document.getElementById('lang-en').classList.toggle('on', lang === 'en');
+        try { localStorage.setItem('cc_lang', lang); } catch (e) {}
+    }
+    (function() {
+        let lang = null;
+        try { lang = localStorage.getItem('cc_lang'); } catch (e) {}
+        if (lang !== 'es' && lang !== 'en') lang = 'en';
+        setLang(lang);
+    })();
+    window.setLang = setLang;
+
+    /* ════════ contact form ════════ */
+    document.getElementById('cf-btn').addEventListener('click', function() {
+        const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
+        const d = I18N[lang];
+        const msg = document.getElementById('cf-msg').value.trim();
+        const email = document.getElementById('cf-email').value.trim();
+        const status = document.getElementById('cf-status');
+
+        if (!msg) { status.textContent = d.cf_empty; return; }
+
+        const subject = encodeURIComponent('terrible crow — message');
+        const body = encodeURIComponent(msg + (email ? '\n\nreply to: ' + email : ''));
+        window.location.href = 'mailto:contact@terriblecrow.com?subject=' + subject + '&body=' + body;
+        status.textContent = d.cf_ok;
+
+        document.getElementById('cf-msg').value = '';
+        document.getElementById('cf-email').value = '';
+    });
+
+    /* ════════ pixel crow ════════ */
+    /* easter egg: clicking the teal eye opens the LinkedIn profile */
+    (function() {
+        const CROW = [
+        '......######........',
+        '....##########......',
+        '...############.....',
+        '.######E########....',
+        '..###############...',
+        '...################.',
+        '....###############.',
+        '.....#############..',
+        '......###########...',
+        '.......#########....',
+        '........#######.....',
+        '.........##..##.....',
+        '.........##..##.....',
+        '........###..###....',
+        ];
+        const cv = document.getElementById('crow'), ctx = cv.getContext('2d');
+        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const GW = CROW[0].length, GH = CROW.length;
+        let cells = [], eye = null, CS = 0, ox = 0, oy = 0, t0 = performance.now();
+        let eyeOpen = false;
+        const hint = document.getElementById('ee-hint');
+
+        CROW.forEach((row, r) => {
+            [...row].forEach((ch, c) => {
+                if (ch === '#') cells.push({ r, c, delay: Math.random() * 1100, shim: 0 });
+                else if (ch === 'E') eye = { r, c };
+            });
+        });
+
+        function resize() {
+            const w = cv.clientWidth, h = w * 0.9;
+            const dpr = Math.min(devicePixelRatio || 1, 2);
+            cv.width = w * dpr; cv.height = h * dpr; cv.style.height = h + 'px';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            CS = Math.floor(Math.min(w / (GW + 2), h / (GH + 2)));
+            ox = (w - GW * CS) / 2; oy = (h - GH * CS) / 2;
+        }
+
+        let blink = 0, nextBlink = 2500;
+
+        function draw(now) {
+            const t = now - t0;
+            ctx.clearRect(0, 0, cv.clientWidth, parseFloat(cv.style.height));
+            for (const cell of cells) {
+                const p = reduced ? 1 : Math.min(1, Math.max(0, (t - cell.delay) / 420));
+                if (p <= 0) continue;
+                const e = 1 - Math.pow(1 - p, 3);
+                const s = e * (CS - 2), off = (CS - s) / 2;
+                let col = '#8b5cf6';
+                if (cell.shim > now) col = '#3fd8c8';
+                else if (((cell.r * 7 + cell.c * 13) % 17) === 0) col = '#a78bfa';
+                ctx.globalAlpha = e * 0.92;
+                ctx.fillStyle = col;
+                ctx.fillRect(ox + cell.c * CS + off, oy + cell.r * CS + off, s, s);
+                ctx.globalAlpha = 1;
+            }
+            if (eye && t > 1200) {
+                eyeOpen = blink < now;
+                const col = eyeOpen ? '#3fd8c8' : '#08070d';
+                ctx.fillStyle = col;
+                ctx.fillRect(ox + eye.c * CS + 1, oy + eye.r * CS + 1, CS - 2, CS - 2);
+                if (now > nextBlink) { blink = now + 140; nextBlink = now + 1800 + Math.random() * 3500; }
+            }
+        }
+
+        function loop(now) {
+            draw(now);
+            if (!reduced && Math.random() < 0.04) {
+                const c = cells[(Math.random() * cells.length) | 0];
+                c.shim = now + 260;
+            }
+            requestAnimationFrame(loop);
+        }
+
+        cv.addEventListener('pointerdown', function(e) {
+            if (eye && eyeOpen) {
+                const rect = cv.getBoundingClientRect();
+                const px = e.clientX - rect.left;
+                const py = e.clientY - rect.top;
+                const ex = ox + eye.c * CS;
+                const ey = oy + eye.r * CS;
+                if (px >= ex && px <= ex + CS && py >= ey && py <= ey + CS) {
+                    hint.classList.add('show');
+                    setTimeout(() => {
+                        window.open('https://www.linkedin.com/in/agustinmattioli/', '_blank', 'noopener');
+                        setTimeout(() => hint.classList.remove('show'), 2400);
+                    }, 340);
+                    return;
+                }
+            }
+            t0 = performance.now();
+            cells.forEach(c => c.delay = Math.random() * 1100);
+        });
+
+        addEventListener('resize', resize);
+        resize();
+        requestAnimationFrame(loop);
+    })();
+
+    /* ════════ roster 001: tiny live conway battle ════════ */
+    (function() {
+        const cv = document.getElementById('gamesim'), ctx = cv.getContext('2d');
+        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const CELL = 9;
+        let W = 0, H = 0, cols = 0, rows = 0, grid, next;
+        function alloc() { grid = new Int8Array(cols * rows); next = new Int8Array(cols * rows); }
+        function seed(team) {
+            const cx = team === 1 ? (cols * 0.25 | 0) : (cols * 0.75 | 0), cy = (rows * Math.random()) | 0;
+            for (let i = 0; i < 26; i++) {
+                const x = cx + ((Math.random() * 9 | 0) - 4), y = cy + ((Math.random() * 9 | 0) - 4);
+                if (x >= 0 && x < cols && y >= 0 && y < rows) grid[y * cols + x] = team;
+            }
+        }
+        function resize() {
+            W = cv.clientWidth; H = cv.clientHeight;
+            const dpr = Math.min(devicePixelRatio || 1, 2);
+            cv.width = W * dpr; cv.height = H * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            cols = Math.ceil(W / CELL); rows = Math.ceil(H / CELL);
+            alloc(); seed(1); seed(2); seed(1); seed(2);
+        }
+        function step() {
+            for (let y = 0; y < rows; y++)
+                for (let x = 0; x < cols; x++) {
+                    let n1 = 0, n2 = 0;
+                    for (let dy = -1; dy <= 1; dy++)
+                        for (let dx = -1; dx <= 1; dx++) {
+                            if (!dx && !dy) continue;
+                            const v = grid[((y + dy + rows) % rows) * cols + ((x + dx + cols) % cols)];
+                            if (v === 1) n1++; else if (v === 2) n2++;
+                        }
+                    const tot = n1 + n2, cur = grid[y * cols + x], i = y * cols + x;
+                    if (cur) next[i] = (tot === 2 || tot === 3) ? cur : 0;
+                    else next[i] = tot === 3 ? (n1 > n2 ? 1 : n1 < n2 ? 2 : (Math.random() < .5 ? 1 : 2)) : 0;
+                }
+            const t = grid; grid = next; next = t;
+        }
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+            let c1 = 0, c2 = 0;
+            for (let y = 0; y < rows; y++)
+                for (let x = 0; x < cols; x++) {
+                    const v = grid[y * cols + x];
+                    if (!v) continue;
+                    if (v === 1) { c1++; ctx.fillStyle = 'rgba(61,142,240,.8)'; }
+                    else { c2++; ctx.fillStyle = 'rgba(232,82,82,.8)'; }
+                    ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+                }
+            if (c1 < 10) seed(1);
+            if (c2 < 10) seed(2);
+        }
+        let last = 0;
+        function loop(t) {
+            if (t - last > (reduced ? 700 : 200)) { last = t; step(); draw(); }
+            requestAnimationFrame(loop);
+        }
+        addEventListener('resize', resize);
+        resize(); draw();
+        requestAnimationFrame(loop);
+    })();
+
+    /* reveal on scroll */
+    (function() {
+        if (!('IntersectionObserver' in window)) {
+            document.querySelectorAll('.rv').forEach(e => e.classList.add('in'));
+            return;
+        }
+        const io = new IntersectionObserver(es => es.forEach(e => {
+            if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+        }), { threshold: .12 });
+        document.querySelectorAll('.rv').forEach(e => io.observe(e));
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Dependencies (this project has none, but just in case)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Leaderboard data — runtime state, never committed.
+# Lives OUTSIDE the deploy dir in production (../cc-data/), but ignore any
+# local copy a dev run might create.
+data/
+cc-data/
+*.leaderboard.json
+leaderboard.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Env / secrets (Discord webhook, etc. are set as host env vars, never in repo)
+.env
+.env.*
+
+# Build artifacts / temp
+*.tmp
+/tmp/
+dist/

@@ -1,0 +1,35 @@
+{
+  "name": "conways-conquerors",
+  "version": "6.0.0",
+  "description": "A 1v1 strategy game built on Conway's Game of Life — vs CPU and online multiplayer. Zero dependencies.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'No build step required — zero dependencies'"
+  },
+  "keywords": [
+    "game",
+    "conway",
+    "game-of-life",
+    "cellular-automaton",
+    "strategy-game",
+    "multiplayer",
+    "websocket",
+    "zero-dependencies",
+    "nodejs"
+  ],
+  "author": "Agustin Mattioli (Terrible Crow)",
+  "license": "MIT",
+  "homepage": "https://terriblecrow.com/conquerors/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/conways-conquerors.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/conways-conquerors/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
