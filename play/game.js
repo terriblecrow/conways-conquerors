@@ -20,7 +20,7 @@ if(typeof CanvasRenderingContext2D!=='undefined' && !CanvasRenderingContext2D.pr
 }
 
 const ROWS=26,COLS=28,CS=22,MPT=4,MAX_ROUNDS=12,ZONE_W=8,BOMB_CD=3,BOMB_UNLOCK=7;
-const GAME_VERSION='6.0';
+const GAME_VERSION='6.1';
 const zoneOf=c=>c<ZONE_W?1:c>=COLS-ZONE_W?2:0;
 const COLOR={
   C1:'#3d8ef0',C2:'#e85252',

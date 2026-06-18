@@ -110,6 +110,7 @@
     .r-links a:hover { opacity: .75 }
     .r-links .play { color: var(--gold); border-color: rgba(200, 160, 32, .4) }
     .r-links .page { color: var(--mu); border-color: var(--b2) }
+    .r-links .code { color: var(--vi); border-color: rgba(139, 92, 246, .4) }
     .r-meta { display: flex; gap: 14px; margin-top: 20px; font-size: 10px; color: var(--dim); letter-spacing: .06em; flex-wrap: wrap }
     /* ── notes ── */
     .notes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;
@@ -165,10 +166,33 @@
     .cf-send:hover { background: rgba(139, 92, 246, .15); border-color: var(--vi) }
     .cf-send:active { transform: scale(.97) }
     .cf-status { font-size: 11px; padding: 0 20px 14px; min-height: 20px; color: var(--te); letter-spacing: .04em }
+    /* ── elsewhere ── */
+    .elsewhere { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+        border: 1px solid var(--b1); border-radius: 10px; overflow: hidden; background: var(--sf) }
+    @media (max-width: 640px) { .elsewhere { grid-template-columns: 1fr } }
+    .ew { display: block; text-decoration: none; padding: 24px 22px; border-left: 1px solid var(--b1);
+        transition: background .15s; position: relative }
+    .ew:first-child { border-left: none }
+    @media (max-width: 640px) {
+        .ew { border-left: none; border-top: 1px solid var(--b1) }
+        .ew:first-child { border-top: none }
+    }
+    .ew:hover { background: var(--sf2) }
+    .ew .ew-k { font-family: var(--disp); font-size: 10px; color: var(--vidim); letter-spacing: .1em;
+        display: block; margin-bottom: 12px }
+    .ew .ew-name { font-family: var(--disp); font-weight: 700; font-size: 14px; color: var(--tx);
+        display: flex; align-items: center; gap: 8px; margin-bottom: 8px; transition: color .15s }
+    .ew:hover .ew-name { color: var(--vi) }
+    .ew .ew-arrow { font-size: 12px; color: var(--mu); transition: transform .15s }
+    .ew:hover .ew-arrow { transform: translate(2px, -2px) }
+    .ew p { font-size: 11px; color: var(--mu); line-height: 1.6 }
+    .ew.gh:hover .ew-name { color: var(--vi) }
+    .ew.itch:hover .ew-name { color: var(--gold) }
+    .ew.yt:hover .ew-name { color: var(--c2) }
     /* ── colophon footer ── */
     footer { padding: 42px 0 50px; font-size: 11px; color: var(--mu) }
-    footer .wrap { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px }
-    @media (max-width: 700px) { footer .wrap { grid-template-columns: 1fr } }
+    footer .wrap { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 24px }
+    @media (max-width: 700px) { footer .wrap { grid-template-columns: 1fr 1fr } }
     footer h4 { font-family: var(--disp); font-size: 10px; font-weight: 700; letter-spacing: .14em;
         text-transform: uppercase; color: var(--dim); margin-bottom: 10px }
     footer p { font-size: 11px; line-height: 1.8 }
@@ -204,6 +228,7 @@
             <div class="nav-links">
                 <a href="#roster" data-i18n="nav_roster"></a>
                 <a href="#notes" data-i18n="nav_notes"></a>
+                <a href="#elsewhere" data-i18n="nav_elsewhere"></a>
                 <a href="#contact" data-i18n="nav_contact"></a>
                 <div class="lang-toggle" role="group" aria-label="Language / Idioma">
                     <button id="lang-es" onclick="setLang('es')">ES</button>
@@ -254,6 +279,7 @@
                         <div class="r-links">
                             <a class="play" href="/play/" data-i18n="r1_play"></a>
                             <a class="page" href="/conquerors/" data-i18n="r1_page"></a>
+                            <a class="code" href="https://github.com/terriblecrow/conways-conquerors" target="_blank" rel="noopener" data-i18n="r1_code"></a>
                         </div>
                         <div class="r-meta">
                             <span data-i18n="r1_m1"></span>
@@ -293,11 +319,38 @@
         </div>
     </section>
 
-    <!-- ── §3 contact ── -->
-    <section id="contact">
+    <!-- ── §3 elsewhere ── -->
+    <section id="elsewhere">
         <div class="wrap">
             <div class="sec-head rv">
                 <span class="sec-num">§3</span>
+                <h2 data-i18n="ew_h2"></h2>
+            </div>
+            <div class="elsewhere rv">
+                <a class="ew gh" href="https://github.com/terriblecrow/conways-conquerors" target="_blank" rel="noopener">
+                    <span class="ew-k">src / 001</span>
+                    <span class="ew-name">github <span class="ew-arrow">↗</span></span>
+                    <p data-i18n="ew_gh"></p>
+                </a>
+                <a class="ew itch" href="https://terriblecrow.itch.io/conways-conquerors" target="_blank" rel="noopener">
+                    <span class="ew-k">store</span>
+                    <span class="ew-name">itch.io <span class="ew-arrow">↗</span></span>
+                    <p data-i18n="ew_itch"></p>
+                </a>
+                <a class="ew yt" href="https://www.youtube.com/@factor9" target="_blank" rel="noopener">
+                    <span class="ew-k">sound</span>
+                    <span class="ew-name">factor 9 <span class="ew-arrow">↗</span></span>
+                    <p data-i18n="ew_yt"></p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── §4 contact ── -->
+    <section id="contact">
+        <div class="wrap">
+            <div class="sec-head rv">
+                <span class="sec-num">§4</span>
                 <h2 data-i18n="contact_h2"></h2>
             </div>
             <div class="contact-grid rv">
@@ -345,6 +398,14 @@
                     <a href="#contact" data-i18n="f_contact"></a>
                 </p>
             </div>
+            <div>
+                <h4 data-i18n="f_elsewhere_h"></h4>
+                <p>
+                    <a href="https://github.com/terriblecrow/conways-conquerors" target="_blank" rel="noopener">github — source</a><br/>
+                    <a href="https://terriblecrow.itch.io/conways-conquerors" target="_blank" rel="noopener">itch.io</a><br/>
+                    <a href="https://www.youtube.com/@factor9" target="_blank" rel="noopener" data-i18n="f_music"></a>
+                </p>
+            </div>
         </div>
     </footer>
 
@@ -355,6 +416,7 @@
             _title: 'terrible crow',
             nav_roster: 'roster',
             nav_notes: 'notes',
+            nav_elsewhere: 'elsewhere',
             nav_contact: 'contact',
             hero_ix: 'a small game studio · est. <em>2026</em>',
             hero_line: 'I program slow-paced video games based on my solitary thoughts, one is out. /<b>Small rules can have long consequences</b>',
@@ -369,11 +431,16 @@
             r1_desc: 'two colonies on one board ruled by <b>Conway\'s Game of Life</b>. you place four cells per turn; the board takes it from there. extinction or majority by round twelve. plays in the browser — practice sandbox, three CPUs, or online against anyone with the room code.',
             r1_play: 'play →',
             r1_page: 'game page',
+            r1_code: 'source ↗',
             r1_m1: 'free',
             r1_m2: 'no account',
             r1_m3: '~2 min to learn',
             r2_name: '%Temporary lost of inform4t1on% — something about memory, and what crows do with it',
             r3_name: '—',
+            ew_h2: 'elsewhere',
+            ew_gh: 'the full source of Conway\'s Conquerors. one Node file, hand-written WebSocket, zero dependencies. read it, fork it, break it.',
+            ew_itch: 'the game\'s page on itch.io — download the Android build or play in the browser.',
+            ew_yt: 'music, under the name factor 9. a different kind of slow construction.',
             notes_h2: 'field notes',
             n1: 'the game of life was invented by <b>John H. Conway in 1970</b>, played by hand with stones on a go board. he later said he grew to hate it for overshadowing everything else he did. we respectfully disagree with him.',
             n2: 'life is <b>Turing-complete</b>: with enough patience you can build a working computer out of gliders and still-lifes. people have. it is very slow and completely useless, which is part of the charm.',
@@ -399,11 +466,14 @@
             f_play: 'play',
             f_notes: 'field notes',
             f_contact: 'contact',
+            f_elsewhere_h: 'elsewhere',
+            f_music: 'music — factor 9',
         },
         es: {
             _title: 'terrible crow',
             nav_roster: 'catálogo',
             nav_notes: 'notas',
+            nav_elsewhere: 'en otros lados',
             nav_contact: 'contacto',
             hero_ix: 'un pequeño estudio de juegos · est. <em>2026</em>',
             hero_line: 'Hago juegos lentos y reflexivos. uno ya salió. <b>A veces el menor movimiento puede provocar el más grande de los cambios</b>',
@@ -418,11 +488,16 @@
             r1_desc: 'dos colonias en un tablero regido por el <b>Juego de la Vida de Conway</b>. colocás cuatro células por turno; el tablero sigue solo. extinción o mayoría en la ronda doce. corre en el navegador — sandbox de práctica, tres CPUs, u online contra cualquiera con el código de sala.',
             r1_play: 'jugar →',
             r1_page: 'página del juego',
+            r1_code: 'código ↗',
             r1_m1: 'gratis',
             r1_m2: 'sin cuenta',
             r1_m3: '~2 min para aprender',
             r2_name: 'Leí algo sobre la memoria, y lo que los cuervos hacen con ella',
             r3_name: '—',
+            ew_h2: 'en otros lados',
+            ew_gh: 'el código completo de Conway\'s Conquerors. un solo archivo Node, WebSocket a mano, cero dependencias. leelo, forkealo, rompelo.',
+            ew_itch: 'la página del juego en itch.io — descargá el build de Android o jugá en el navegador.',
+            ew_yt: 'música, bajo el nombre factor 9. otra clase de construcción lenta.',
             notes_h2: 'notas de campo',
             n1: 'el juego de la vida lo inventó <b>John H. Conway en 1970</b>, jugándolo a mano con piedras sobre un tablero de go. después dijo que llegó a odiarlo porque eclipsó todo lo demás que hizo. respetuosamente, no estamos de acuerdo.',
             n2: 'life es <b>Turing-completo</b>: con suficiente paciencia se puede construir una computadora funcional con planeadores y naturalezas muertas. hay gente que lo hizo. es lentísima y completamente inútil, que es parte del encanto.',
@@ -448,6 +523,8 @@
             f_play: 'jugar',
             f_notes: 'notas de campo',
             f_contact: 'contacto',
+            f_elsewhere_h: 'en otros lados',
+            f_music: 'música — factor 9',
         }
     };
 

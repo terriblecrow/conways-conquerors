@@ -30,6 +30,7 @@
 'use strict';
 
 const http   = require('http');
+const https  = require('https');
 const crypto = require('crypto');
 const fs     = require('fs');
 const path   = require('path');
@@ -38,6 +39,68 @@ const os     = require('os');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const ROOT = __dirname;
+
+// ── Discord notifications (optional) ───────────────────────────────────────
+// If DISCORD_WEBHOOK_URL is set in the environment, the server posts brief,
+// privacy-respecting notifications to a Discord channel: when a public room
+// opens (so people can come play) and when an online game finishes. This is
+// entirely optional — without the env var the whole feature is a no-op. It uses
+// only the built-in https module (zero dependencies) and never blocks game
+// logic: failures are swallowed and posts are rate-limited so a busy server
+// can't spam the channel or hit Discord's limits.
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
+const DISCORD = {
+  enabled: /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(DISCORD_WEBHOOK_URL),
+  lastPost: 0,
+  minGapMs: 4000,        // never post more than once every 4s
+  recentLobby: new Map(), // roomId → ts, so we don't double-announce a room
+};
+
+function discordPost(content) {
+  if (!DISCORD.enabled) return;
+  const now = Date.now();
+  if (now - DISCORD.lastPost < DISCORD.minGapMs) return; // rate limit, drop
+  DISCORD.lastPost = now;
+  let body;
+  try {
+    body = JSON.stringify({
+      content: String(content).slice(0, 1800),
+      // never ping anyone, even if a player's name contains @everyone etc.
+      allowed_mentions: { parse: [] },
+    });
+  } catch (e) { return; }
+  try {
+    const u = new URL(DISCORD_WEBHOOK_URL);
+    const req = https.request({
+      hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+      timeout: 4000,
+    }, res => { res.on('data', () => {}); res.on('end', () => {}); });
+    req.on('error', () => {});   // never let a webhook failure affect the game
+    req.on('timeout', () => req.destroy());
+    req.write(body); req.end();
+  } catch (e) { /* swallow */ }
+}
+
+function discordAnnounceLobby(room) {
+  if (!DISCORD.enabled) return;
+  const now = Date.now();
+  // de-dupe: only announce a given room once, and clean old entries
+  if (DISCORD.recentLobby.has(room.id)) return;
+  DISCORD.recentLobby.set(room.id, now);
+  for (const [id, ts] of DISCORD.recentLobby) if (now - ts > 15 * 60000) DISCORD.recentLobby.delete(id);
+  const flag = room.flag || '🌐';
+  const host = (room.names[1] || 'Someone').slice(0, 20);
+  discordPost(`${flag} **${host}** opened a public game — join the lobby at https://terriblecrow.com/play/`);
+}
+
+function discordAnnounceResult(room, winner, p1, p2, byExtinction) {
+  if (!DISCORD.enabled || winner === 0) return;
+  const wName = (room.names[winner] || 'Player').slice(0, 20);
+  const how = byExtinction ? 'by extinction' : `${Math.max(p1, p2)}–${Math.min(p1, p2)} on cells`;
+  discordPost(`🏆 **${wName}** won an online match ${how}, in ${room.round} rounds.`);
+}
+
 
 // ── Game constants (must match game.js) ───────────────────────────────────
 const ROWS=26, COLS=28, MPT=4, MAX_ROUNDS=12, ZONE_W=8, BOMB_CD=3, BOMB_UNLOCK=7;
@@ -533,6 +596,7 @@ class Room {
       const lp = winner === 1 ? 2 : 1;
       const lName = this.names[lp] || 'Player';
       recordResult(this.pids[lp], lName, 0, { mode:'online', winner:false });
+      discordAnnounceResult(this, winner, p1, p2, byExtinction);
     }
     // clean up room after delay (cancelled if players restart)
     this.cleanupTimer = setTimeout(() => rooms.delete(this.id), 60000);
@@ -697,6 +761,7 @@ function handleMessage(socket, msg) {
       room.pids[1]    = pid;
       socket.send(JSON.stringify({ type:'waiting', room: id, public: room.public,
         flag: room.flag, country: room.country }));
+      if (room.public) discordAnnounceLobby(room);
     }
     return;
   }
@@ -1016,10 +1081,11 @@ server.on('upgrade', upgradeToWS);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('');
-  console.log('  Conway\'s Conquerors v6.0 (competitive AI tuning) — server up on port ' + PORT);
+  console.log('  Conway\'s Conquerors v6.1 (open-source page + Discord notifications) — server up on port ' + PORT);
   console.log('  Routes: /  /conquerors/  /play/  /api/*');
   console.log('  Online play: WebSocket + automatic HTTP-polling fallback');
   console.log('  Limits: ' + LIMITS.ROOMS_PER_IP + ' rooms/IP · ' + LIMITS.JOINS_PER_MIN + ' joins/min/IP');
+  console.log('  Discord notifications: ' + (DISCORD.enabled ? 'ON' : 'off (set DISCORD_WEBHOOK_URL to enable)'));
   console.log('');
 });
 

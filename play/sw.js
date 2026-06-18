@@ -2,8 +2,8 @@
  * Strategy: NETWORK-FIRST for everything. The stale-code problem on mobile is
  * real, so the SW must never pin old game.js; the cache exists only as an
  * offline fallback for the app shell. /api/ is never intercepted. */
-const CACHE='cc-shell-v60';
-const SHELL=['/play/','/play/index.html','/play/game.js?v=60','/play/favicon.svg',
+const CACHE='cc-shell-v61';
+const SHELL=['/play/','/play/index.html','/play/game.js?v=61','/play/favicon.svg',
   '/play/icons/icon-192.png','/play/icons/icon-512.png'];
 
 self.addEventListener('install',e=>{
