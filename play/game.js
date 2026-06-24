@@ -256,14 +256,18 @@ const easeOut=t=>1-Math.pow(1-t,3);
 // ── Territory ─────────────────────────────────────────────────────────────
 function reachableZones(p){
   const z=new Set([p]),e=p===1?2:1;
+  // anchor at home: at least one own cell in own zone → unlocks neutral
   let a=false;
   outer: for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]===p&&zoneOf(c)===p){a=true;break outer;}
   if(a) z.add(0);
+  // own cell present in neutral
   let n=false;
   outer2: for(let r=0;r<ROWS;r++) for(let c=ZONE_W;c<COLS-ZONE_W;c++) if(board[r][c]===p){n=true;break outer2;}
+  // own cell present in rival zone
   let en=false;
   outer3: for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]===p&&zoneOf(c)===(e)){en=true;break outer3;}
-  if(n&&en) z.add(e);
+  // rival zone unlocked only with a full presence chain: home AND neutral AND rival
+  if(a&&n&&en) z.add(e);
   return z;
 }
 
@@ -281,6 +285,9 @@ function accessLabel(p){
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const count=p=>{let n=0;for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(board[r][c]===p)n++;return n;};
+// Weighted score: a player's own cell sitting in the RIVAL zone counts x2.
+// (own zone / neutral count x1). Used for HUD bars and win decisions.
+const score=p=>{const e=p===1?2:1;let n=0;for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(board[r][c]===p)n+=(zoneOf(c)===e?2:1);return n;};
 const setMsg=(t,cls='')=>{const e=document.getElementById('msg');e.textContent=t;e.className=cls;};
 
 function getCell(ev){
@@ -299,7 +306,7 @@ function getCell(ev){
 
 // ── HUD ───────────────────────────────────────────────────────────────────
 function updateHUD(){
-  const p1=count(1),p2=count(2),tot=Math.max(1,p1+p2);
+  const p1=score(1),p2=score(2),tot=Math.max(1,p1+p2);
   document.getElementById('rnd-val').textContent=round+'/'+MAX_ROUNDS;
   document.getElementById('s1').textContent=p1;
   document.getElementById('s2').textContent=p2;
@@ -518,13 +525,92 @@ function placementImpact(r,c,p){
   return {own:ownA-ownB,enemy:enA-enB};
 }
 
+// ── Full-turn evaluation ───────────────────────────────────────────────────
+// The greedy per-cell scorer is blind to two things that matter a lot under
+// the V2 rules: (1) whether a whole 4-cell turn SURVIVES the next generation
+// as a group, and (2) the x2 value of cells that end up in the rival zone.
+// evalBoardForCPU simulates one real Conway generation over the ACTUAL board
+// state (with the candidate cells already stamped) and returns a weighted,
+// zone-aware heuristic from the CPU's (player 2) perspective.
+//
+// We snapshot/restore board so callers can probe hypothetical placements.
+function simNextGenScore(){
+  // one generation, but we only need the resulting WEIGHTED material balance
+  // (own rival cells x2) plus the presence-chain bonus, not a full new board.
+  const e=1; // CPU is player 2, enemy is 1
+  let myScore=0,enScore=0;
+  // presence flags for the chain: own cell in home(2)/neutral(0)/rival(1)
+  let mineHome=false,mineNeut=false,mineRival=false;
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    let n1=0,n2=0;
+    for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+      if(!dr&&!dc) continue;
+      const nr=r+dr,nc=c+dc;
+      if(nr>=0&&nr<ROWS&&nc>=0&&nc<COLS){const v=board[nr][nc];if(v===1)n1++;else if(v===2)n2++;}
+    }
+    const tot=n1+n2,cur=board[r][c];
+    let nxt=0;
+    if(cur) nxt=(tot===2||tot===3)?cur:0;
+    else if(tot===3) nxt=n1>n2?1:n1<n2?2:(((r+c)&1)?1:2);
+    if(!nxt) continue;
+    const z=zoneOf(c);
+    if(nxt===2){
+      myScore+=(z===e?2:1); // own cell in rival zone counts x2
+      if(z===2)mineHome=true; else if(z===0)mineNeut=true; else if(z===1)mineRival=true;
+    } else if(nxt===e){
+      enScore+=(z===2?2:1); // symmetric: enemy in OUR zone is x2 for them
+    }
+  }
+  // chain awareness: reward building toward unlocking the x2 rival zone, and
+  // hard-penalize the catastrophic state of losing the home anchor (which
+  // under V2 rules locks the CPU out of neutral AND rival next turn).
+  let chain=0;
+  if(!mineHome) chain-=30;           // losing home anchor is near-fatal
+  else{
+    if(mineNeut) chain+=4;           // neutral foothold held
+    if(mineNeut&&mineRival) chain+=10; // full chain → rival x2 stays unlocked
+  }
+  return myScore - enScore + chain;
+}
+
+// Evaluate a complete candidate turn (list of [r,c] cells) by stamping them,
+// running one generation in simulation, and reading the weighted balance.
+function evalTurn(cells){
+  const snap=board.map(row=>Int8Array.from(row));
+  for(const [r,c] of cells) board[r][c]=2;
+  const v=simNextGenScore();
+  board=snap; // restore exact state
+  return v;
+}
+
 function cpuScore(r,c){
   let score=0;
   const z=zoneOf(c);
+  // current presence chain BEFORE this placement
+  const reach=reachableZones(2);
+  const homeCells=homeAnchorCount(2);
+
   if(z===0)score+=5;          // pushing into neutral is good
-  // Invading enemy zone: gated to later rounds so the CPU builds a stable home
-  // colony first instead of rushing in and triggering overcrowding wipes.
-  if(z===1)score+=(round>=6?4:1);
+  // Invading the rival zone is now worth x2 material — but only legal/useful
+  // once the presence chain (home+neutral+rival) is established. Reward heavily
+  // when the chain is unlocked, and reward "completing the chain" placements.
+  if(z===1){
+    if(reach.has(1))score+=(round>=5?14:6); // chain open → real x2 payoff
+    else score+=2;                          // seed a beachhead toward the chain
+  }
+  // Chain-builder bonus: if we hold home+rival but lack a neutral foothold,
+  // placing in neutral directly unlocks the lucrative rival x2 next turn.
+  if(z===0 && reach.has(2) && hasCellIn(2,1) && !hasCellIn(2,0))score+=8;
+
+  // HOME ANCHOR DEFENSE — the critical V2 rule. If our home zone is thin
+  // (≤2 cells), reinforcing it is worth a lot: losing it locks us out of
+  // neutral and the rival x2 entirely. Conversely don't over-stuff a healthy
+  // home and starve expansion.
+  if(z===2){
+    if(homeCells<=2)score+=12;
+    else if(homeCells<=4)score+=4;
+    else if(homeCells>=10)score-=3;
+  }
 
   // light shape heuristic: mild preference for touching 1-2 own cells
   let ownN=0;
@@ -549,19 +635,19 @@ function cpuScore(r,c){
     else if(adjTurn>=2)score+=16; // completing an L / line
   }
 
-  // the heart: simulated local impact of this placement
-  // ALL difficulties use it (so even Easy doesn't suicide); Easy just weighs
-  // it less and adds more noise, which makes it sloppy without being brainless.
+  // the heart: simulated local impact of this placement. The own-delta is now
+  // weighted by zone so the scorer values surviving rival-zone cells double.
   const imp=placementImpact(r,c,2);
   const w=cpuDifficulty==='easy'?5:cpuDifficulty==='normal'?9:10;
-  score+=imp.own*w;
-  if(cpuDifficulty==='hard'){
-    score+=Math.max(0,-imp.enemy)*4; // hard also values hurting the enemy
+  const zoneMult=(z===1)?2:1; // own cell delta in rival zone is worth x2
+  score+=imp.own*w*zoneMult;
+  if(cpuDifficulty!=='easy'){
+    score+=Math.max(0,-imp.enemy)*(cpuDifficulty==='hard'?4:2); // value hurting the enemy
     // late-game killer instinct: when the enemy colony is already small, hard
     // prioritizes moves that shrink it further, pushing toward a real extinction
     // win instead of coasting to a round-12 count victory. Makes high-difficulty
     // games feel more decisive and dangerous to the human.
-    if(round>=7){
+    if(cpuDifficulty==='hard'&&round>=7){
       const enemyTotal=count(1);
       if(enemyTotal>0&&enemyTotal<=12)score+=Math.max(0,-imp.enemy)*6;
     }
@@ -572,6 +658,19 @@ function cpuScore(r,c){
   return score;
 }
 
+// presence helpers for the CPU scorer
+function hasCellIn(p,zone){
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+    if(board[r][c]===p&&zoneOf(c)===zone) return true;
+  return false;
+}
+function homeAnchorCount(p){
+  let n=0;
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+    if(board[r][c]===p&&zoneOf(c)===p)n++;
+  return n;
+}
+
 function cpuUseBomb(){
   if(abilityCooldown[1]>0) return false;
   // Only bomb LARGE enemy clusters, never before round 4, and NEVER when the
@@ -580,12 +679,16 @@ function cpuUseBomb(){
   if(round<BOMB_UNLOCK) return false;
   let best=-Infinity,br=-1,bc=-1,bestEnemy=0;
   for(let r=1;r<ROWS-1;r++) for(let c=1;c<COLS-1;c++){
-    let e=0,own=0;
+    let e=0,own=0,eInOurZone=0,ownHome=0;
     for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
-      const v=board[r+dr][c+dc];
-      if(v===1)e++; else if(v===2)own++;
+      const rr=r+dr,cc=c+dc,v=board[rr][cc];
+      if(v===1){e++; if(zoneOf(cc)===2)eInOurZone++;}      // enemy in our zone = x2 for them
+      else if(v===2){own++; if(zoneOf(cc)===2)ownHome++;}  // our own home cells
     }
-    const s=e-own*1.5; // own cells weigh more: friendly fire is worse than missing
+    // value: enemy hits, with double weight on enemy cells squatting in our
+    // home zone (worth x2 to them under V2). Own cells cost; home-anchor cells
+    // cost extra so the bomb never self-locks our presence chain.
+    const s=e + eInOurZone - own*1.5 - ownHome*2.5;
     if(s>best){best=s;br=r;bc=c;bestEnemy=e;}
   }
   // require a dense enemy cluster AND a clearly positive trade. Hard bombs more
@@ -641,6 +744,39 @@ function cpuPickCell(){
   return cands[Math.floor(Math.random()*pool)];
 }
 
+// HARD full-turn planner: instead of greedily committing 4 cells one at a time
+// (which is blind to how the four interact after evolution), build a shortlist
+// of strong individual candidates, then search combinations of 4 and keep the
+// set whose ONE-GENERATION-LATER weighted board (rival x2 + presence chain) is
+// best. Greedy expansion from the shortlist keeps the search cheap.
+function cpuPlanTurn(){
+  const raw=[];
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
+    if(canPlace(r,c)) raw.push([r,c,cpuScore(r,c)]);
+  if(!raw.length) return null;
+  raw.sort((a,b)=>b[2]-a[2]);
+  const shortlist=raw.slice(0,Math.min(14,raw.length)).map(x=>[x[0],x[1]]);
+
+  // greedy set construction guided by full-board lookahead: at each step add
+  // the shortlist cell that most improves the simulated next-gen score.
+  const chosen=[];
+  for(let step=0;step<MPT;step++){
+    let best=null,bestV=-Infinity;
+    for(const cand of shortlist){
+      if(chosen.some(([r,c])=>r===cand[0]&&c===cand[1])) continue;
+      // candidate must still be legally placeable given cells chosen so far
+      // (placing in rival can become legal mid-turn once chain is built — but
+      // canPlace is evaluated on the live board, which we haven't mutated, so
+      // re-check against a board that includes chosen cells)
+      const v=evalTurn([...chosen,cand]);
+      if(v>bestV){bestV=v;best=cand;}
+    }
+    if(!best) break;
+    chosen.push(best);
+  }
+  return chosen.length?chosen:null;
+}
+
 function cpuTakeTurn(){
   const myGen=gameGen;
   const delay=cpuDifficulty==='easy'?320:cpuDifficulty==='normal'?480:680;
@@ -653,12 +789,18 @@ function cpuTakeTurn(){
     }
     cpuTurnPlaced=new Set();
     // no standing colony (first turn or wiped out) → stamp a stable block
-    const plan=(count(2)<3)?cpuPickBlock():null;
+    let plan=(count(2)<3)?cpuPickBlock():null;
+    // HARD with an established colony → plan the whole 4-cell turn with
+    // one-generation lookahead instead of greedy per-cell placement.
+    if(!plan && cpuDifficulty==='hard' && count(2)>=3) plan=cpuPlanTurn();
     let placed=0;
     const next=()=>{
       if(myGen!==gameGen) return; // reset mid-sequence — stop placing
       if(placed>=MPT){cpuTurnPlaced=null;doEvolution();return;}
-      const cell=plan?plan[placed]:cpuPickCell();
+      // a plan may be shorter than MPT (planner found few good cells); once it
+      // runs out, fill remaining placements with greedy picks so the CPU never
+      // wastes a placement.
+      const cell=(plan&&plan[placed])?plan[placed]:cpuPickCell();
       if(!cell){cpuTurnPlaced=null;doEvolution();return;}
       board[cell[0]][cell[1]]=2;placed++;moves--;
       cpuTurnPlaced.add(cell[0]+','+cell[1]);
@@ -796,7 +938,7 @@ function practiceCoach(){
   if(lastAccess[player]&&lastAccess[player]!==acc){
     lastAccess[player]=acc;
     if(acc==='home + neutral')return '  ·  tip: neutral unlocked — expand to the middle';
-    if(acc==='full access')return '  ·  tip: enemy zone open — you can place inside their territory';
+    if(acc==='full access')return '  ·  tip: enemy zone open — your cells there count x2';
     if(acc==='home zone only')return '  ·  tip: you lost neutral access — rebuild at home first';
   }
   lastAccess[player]=acc;
@@ -821,16 +963,17 @@ function doEvolution(){
 // Shared post-evolution flow: win checks, cooldowns, turn switch.
 // Used by both doEvolution (normal mode) and confirmPreview (guided mode).
 function postEvolution(){
-  const p1=count(1),p2=count(2);
+  const p1=count(1),p2=count(2);          // raw cells — for elimination check
   if(player===2) round++;
   const bothPlayed=round>=2||(round===1&&player===2);
   if(bothPlayed){
-    if(!p1&&!p2){endGame(0,p1,p2);return;}
-    if(!p1){endGame(2,p1,p2);return;}
-    if(!p2){endGame(1,p1,p2);return;}
+    if(!p1&&!p2){endGame(0,score(1),score(2));return;}
+    if(!p1){endGame(2,score(1),score(2));return;}
+    if(!p2){endGame(1,score(1),score(2));return;}
   }
   if(round>MAX_ROUNDS){
-    endGame(p1>p2?1:p2>p1?2:0,p1,p2);return;
+    const s1=score(1),s2=score(2);
+    endGame(s1>s2?1:s2>s1?2:0,s1,s2);return;
   }
   const cdWas=[abilityCooldown[0],abilityCooldown[1]];
   abilityCooldown[0]=Math.max(0,abilityCooldown[0]-1);
