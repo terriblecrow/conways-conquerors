@@ -3,6 +3,36 @@
 All notable changes to Conway's Conquerors. This project loosely follows
 [Semantic Versioning](https://semver.org/).
 
+## [7.0.0] — V2 territorial rules & full-turn AI
+
+- **Enemy territory counts double.** Each of a player's cells inside the rival's
+  home zone is now worth x2 toward their score. The final-majority win is decided
+  on this weighted score; extinction still wins outright. HUD bars and the
+  end-of-game result use the weighted score, while raw cell count still drives
+  the extinction check.
+- **Invasion now requires a full chain of presence.** Placing in the enemy zone
+  is legal only while the player simultaneously holds cells at home **and** in
+  neutral **and** already inside the enemy zone. Losing the home anchor re-locks
+  neutral and the enemy zone, as before. (Previously only neutral + enemy
+  presence were required.)
+- **Reworked the Hard AI around the new rules:**
+  - **Full-turn planning.** Instead of greedily committing four cells one at a
+    time, Hard now builds a shortlist of strong candidates and searches for the
+    set of four whose board, after one simulated generation, scores best —
+    weighting surviving rival-zone cells x2.
+  - **Home-anchor defense.** The scorer reinforces the home zone when it runs
+    thin (≤2 cells), since losing it locks the CPU out of neutral and the x2
+    enemy zone. Across thousands of self-play turns the AI never lost its anchor
+    while alive, even against a rival invading its zone every turn.
+  - **Invasion-chain pursuit & weighted invasion.** The AI seeds neutral to
+    unlock the enemy zone and values surviving cells there at x2.
+  - **Smarter bomb.** Now values destroying enemy cells squatting in the CPU's
+    own zone (worth x2 to them) and hard-penalizes blasting its own anchor.
+- Result (self-play): a steep, monotone ladder — Hard beats Normal 92–5 and Easy
+  99–1 — and markedly more decisive games (Easy-vs-Hard ends by extinction 66% of
+  the time). See `RESEARCH-PAPER.md` §6 for the full V2 campaign.
+- Devlog/landing and research paper updated for the V2 rules and AI.
+
 ## [6.0.0] — Competitive AI tuning
 
 - Reworked the Hard AI to be more competitive and decisive, based on a self-play

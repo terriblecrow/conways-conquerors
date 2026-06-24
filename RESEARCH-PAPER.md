@@ -1,6 +1,6 @@
 # Conway's Conquerors: A Competitive Two-Color Cellular Automaton — Design, Analysis, and Empirical Balance Study
 
-**Terrible Crow — Research Report RR-001 (v5.5, 2026)**
+**Terrible Crow — Research Report RR-001 (v7.0 / "V2", 2026)**
 
 *A. Mattioli, Terrible Crow Studio*
 
@@ -8,7 +8,7 @@
 
 ## Abstract
 
-Conway's Conquerors is a two-player, perfect-information, deterministic strategy game played on a bounded two-color variant of Conway's Game of Life (the *Immigration Game*). Players alternately seed cells into a 26×28 grid; after each turn the grid advances one synchronous generation under B3/S23 rules with majority-color births. This report specifies the game formally, situates it against the classical theory of cellular automata (clarifying which results from unbounded Life do and do not transfer to a finite board), documents a dependency-free authoritative-server architecture with a hand-written WebSocket implementation and a transparent long-polling fallback, and presents an empirical balance study of the heuristic AI based on several hundred simulated self-play games. The baseline measurement found a correct but unevenly-spaced difficulty ladder: Easy clearly separated from the higher tiers, but Normal and Hard statistically close (a near coin-flip in self-play), with high-tier games almost never ending by extinction. We then introduce two targeted, difficulty-exclusive changes to the Hard tier — a difficulty-scaled bomb threshold and a late-game "killer-instinct" term that hunts weakened colonies — and re-measure. The tuned AI shows a steep, monotone ladder at every rung (Hard beats Normal 64–35 and Easy 89–10) and markedly higher decisiveness against weaker play (extinction rate up to 34% in Easy-vs-Hard), achieved without altering Normal's or Easy's own parameters. We report both campaigns in full so the effect of each change is auditable; all data are reproducible from the open game source via a harness that extracts the live AI functions rather than reimplementing them.
+Conway's Conquerors is a two-player, perfect-information, deterministic strategy game played on a bounded two-color variant of Conway's Game of Life (the *Immigration Game*). Players alternately seed cells into a 26×28 grid; after each turn the grid advances one synchronous generation under B3/S23 rules with majority-color births. This report specifies the game formally, situates it against the classical theory of cellular automata (clarifying which results from unbounded Life do and do not transfer to a finite board), documents a dependency-free authoritative-server architecture with a hand-written WebSocket implementation and a transparent long-polling fallback, and presents an empirical balance study of the heuristic AI based on several hundred simulated self-play games. The baseline measurement found a correct but unevenly-spaced difficulty ladder: Easy clearly separated from the higher tiers, but Normal and Hard statistically close (a near coin-flip in self-play), with high-tier games almost never ending by extinction. We then introduce two targeted, difficulty-exclusive changes to the Hard tier — a difficulty-scaled bomb threshold and a late-game "killer-instinct" term that hunts weakened colonies — and re-measure. The tuned AI shows a steep, monotone ladder at every rung (Hard beats Normal 64–35 and Easy 89–10) and markedly higher decisiveness against weaker play (extinction rate up to 34% in Easy-vs-Hard), achieved without altering Normal's or Easy's own parameters. A third campaign documents the **V2 ruleset**, which adds two territorial mechanics — rival-zone cells scored at double weight, and an invasion gate requiring a simultaneous chain of presence across all three zones — together with a Hard tier reworked around them: full four-cell turn planning under one-generation lookahead, explicit home-anchor defense, and weighted invasion. Under V2 the ladder remains steep and monotone (Hard beats Normal 92–5 and Easy 99–1) and high-difficulty play against weaker tiers becomes markedly more decisive (Easy-vs-Hard extinction 66%). We report all three campaigns in full so the effect of each change is auditable; all data are reproducible from the open game source via a harness that extracts the live AI functions rather than reimplementing them.
 
 ---
 
@@ -52,13 +52,21 @@ Players $p\in\{1,2\}$ alternate, blue first. A turn is exactly $M=4$ placements 
 
 1. own home — always legal;
 2. neutral — legal iff the player has a live cell in its home zone;
-3. enemy home — legal iff the player has live cells in neutral **and** at least one live cell already inside the enemy zone.
+3. enemy home — legal iff the player **simultaneously** has a live cell in its home zone, a live cell in neutral, **and** at least one live cell already inside the enemy zone.
 
-Condition (3) cannot be satisfied by placement alone, since placing there is illegal until the condition already holds; the first cell inside enemy territory must be *born* there by the evolution. Invasion is therefore an emergent achievement of the dynamics, not a purchasable action. Access is revocable: losing all home-zone cells re-locks neutral.
+Condition (3) is the **V2 presence chain**: invasion access requires holding all three zones at once, not merely neutral-plus-enemy presence. It cannot be satisfied by placement alone, since placing in enemy territory is illegal until the condition already holds; the first cell inside enemy territory must be *born* there by the evolution. Invasion is therefore an emergent achievement of the dynamics, not a purchasable action. Access is revocable and the home anchor is its keystone: losing all home-zone cells re-locks both neutral *and* the enemy zone in the same turn.
+
+**Weighted scoring (V2).** A player's score weights each live cell by location: a cell sitting inside the *enemy* home zone counts double; cells in the player's own zone or in neutral count once. Formally, with $z(x)$ the zone of cell $x$ and $\bar p$ the opponent of $p$,
+
+$$
+\mathrm{sc}(p,B)=\sum_{x:\,B(x)=p}\big(1+[\,z(x)=\text{home}(\bar p)\,]\big).
+$$
+
+This weighting is the strategic centre of V2: a successfully-held invasion is worth twice as much material as the same cells at home, making the costly presence-chain push toward enemy territory rational rather than merely aggressive.
 
 **Full-turn actions.** The *bomb* clears the 3×3 Moore neighborhood of a target (states set to 0); it unlocks at round $K/2+1=7$, consumes the entire turn, and has a 3-turn-end cooldown. The *skip* forfeits the four placements (the generation still runs) and is available once per player per game; it can be optimal because placements carry negative value when they would overcrowd friendly cells.
 
-**Termination.** With $\#p(B)$ the cell count of player $p$, evaluated after each post-turn generation but suppressed until both players have moved at least once: extinction ($\#\bar p=0\wedge\#p>0$) wins for $p$; mutual emptiness is a draw; after round $K$ the higher count wins, equal counts draw.
+**Termination.** Let $\#p(B)$ be the raw cell count and $\mathrm{sc}(p,B)$ the weighted score of §2.3. Evaluated after each post-turn generation but suppressed until both players have moved at least once: **extinction** is checked on the raw count — $\#\bar p=0\wedge\#p>0$ wins for $p$, mutual emptiness draws — so a player with zero cells loses regardless of any prior score. If no one is extinct after round $K$, the **majority** result uses the weighted score: higher $\mathrm{sc}$ wins, equal scores draw. The two metrics serve different roles: extinction asks *who is still alive*, majority asks *who controls more weighted territory*.
 
 The game is finite, perfect-information, and deterministic, so optimal strategies exist by backward induction. The obstacle is size: an upper bound on one turn's placement choices is $\binom{728}{4}\approx1.16\times10^{10}$, and with home-only access still $\binom{208}{4}\approx7.6\times10^{7}$, making exhaustive search infeasible beyond shallow depth.
 
@@ -79,7 +87,7 @@ Two famous global results, however, do **not** transfer as usually stated:
 
 ### 4.1 Authoritative server, transport-agnostic rooms
 
-A single dependency-free Node.js process (built-in `http`, `crypto`, `fs`, `path`, `os` only) serves static assets and owns all online game state. Clients are views: `move` is validated against the same zone-reachability predicate of §2.3, `bomb` against the round gate and cooldown, and turn ownership is checked on every message. The room logic is written against a minimal socket surface (`send`, `_wsState`, `_room`, `_player`); both transports below implement that surface, so the game code has a single path regardless of wire format.
+A single dependency-free Node.js process (built-in `http`, `crypto`, `fs`, `path`, `os` only) serves static assets and owns all online game state. Clients are views: `move` is validated against the same zone-reachability predicate of §2.3 — including the V2 presence chain — `bomb` against the round gate and cooldown, and turn ownership is checked on every message. The end-of-round majority decision uses the weighted score of §2.3 (rival cells x2) while extinction is checked on the raw count, so server and client agree bit-for-bit on both legality and outcome. The room logic is written against a minimal socket surface (`send`, `_wsState`, `_room`, `_player`); both transports below implement that surface, so the game code has a single path regardless of wire format.
 
 ### 4.2 WebSocket and long-polling fallback
 
@@ -125,13 +133,27 @@ The term $\kappa(x)$ is the *killer-instinct* bonus introduced in v5.5 (§6.5): 
 
 The bomb is considered from round 7 with probability 0.8 (hard) / 0.35 (otherwise), targeting the 3×3 maximizing $e-1.5\,o$ (enemy minus weighted own cells). The firing threshold is *difficulty-scaled* (v5.5): Hard fires when $e\geq 5$ and the trade score $\geq 3$; Normal and Easy keep the conservative $e\geq 6,\ \text{score}\geq 4$. Hard therefore bombs smaller clusters on a thinner margin, which both shortens games and raises its win rate against weaker tiers without collapsing the Normal–Hard distinction.
 
+### 5.4 V2 zone-aware scoring
+
+Under V2 the per-cell heuristic is extended to reflect the two new mechanics. The zone term $w_z$ now pays a large bonus for the enemy zone *only when the presence chain is open* — the move is otherwise illegal — and the simulated own-delta $\Delta_{\text{own}}$ is weighted x2 for rival-zone placements, mirroring the doubled material value of a held invasion. A *chain-builder* bonus rewards seeding neutral when the player already holds home and enemy cells but lacks a neutral foothold, since that single placement unlocks the lucrative enemy zone next turn. The bomb evaluator gains symmetric awareness: enemy cells squatting in the CPU's own zone (worth x2 to the opponent) are weighted double as targets, and own home-anchor cells carry an extra cost so the blast never self-locks the CPU's presence chain.
+
+### 5.5 Full-turn planning (Hard)
+
+The per-cell scorer of §5.1–5.4 is greedy: it commits placements one at a time, blind to how the four cells of a turn interact after the next generation. This is adequate for Easy and Normal but leaves value on the table for Hard, especially under V2 where a coordinated four-cell push can establish or hold an invasion that no single cell could. Hard therefore plans the **whole turn**:
+
+1. score every legal candidate with the per-cell function and take the top ~14 as a shortlist;
+2. build the four-cell set greedily *under full-board lookahead* — at each step add the shortlist cell that most improves a one-generation simulation of the entire board, evaluated by the weighted material balance (rival cells x2) plus a presence-chain term;
+3. if the planner returns fewer than four cells (few good options), fill the remainder with greedy picks so no placement is wasted.
+
+The lookahead evaluator runs one real generation over the actual board — not the 5×5 window of §5.1 — so it captures whole-shape survival and zone transitions that the local window cannot. The presence-chain term in the evaluator hard-penalizes the catastrophic state of losing the home anchor (which under V2 re-locks neutral and the enemy zone) and rewards completing the home→neutral→rival chain that keeps the x2 zone open. Easy and Normal retain the per-cell greedy path with their existing noise, preserving their feel; only Hard plans.
+
 ---
 
 ## 6. Empirical balance study
 
 ### 6.1 Method
 
-We extracted the shipped AI functions (not a reimplementation) into a headless harness and ran self-play between difficulty tiers. The harness reproduces the exact evolution, reachability, scoring, and bomb logic, mirroring the AI for the first player by color-swapping the board so the player-2-coded functions apply to either side. Victory checking is suppressed until both players have moved, matching the server. Each matchup ran 50–120 games; results are reported as win percentages for player 1 (P1) and player 2 (P2), with the fraction ending by extinction, mean final round, and mean cell margin. We report two measurement campaigns: the **baseline** (release v5.4, before tuning) and the **tuned** AI (v5.5, after the changes of §6.4).
+We extracted the shipped AI functions (not a reimplementation) into a headless harness and ran self-play between difficulty tiers. The harness reproduces the exact evolution, reachability, scoring, and bomb logic, mirroring the AI for the first player by color-swapping the board so the player-2-coded functions apply to either side. Victory checking is suppressed until both players have moved, matching the server. Each matchup ran 50–200 games; results are reported as win percentages for player 1 (P1) and player 2 (P2), with the fraction ending by extinction, mean final round, and mean cell margin. We report three measurement campaigns: the **baseline** (release v5.4, before tuning), the **tuned** AI (v5.5, after the changes of §6.4), and the **V2** ruleset (v7.0, §6.6, after the territorial rules and full-turn Hard planner).
 
 ### 6.2 Results
 
@@ -189,17 +211,42 @@ Comparing the two campaigns in §6.2:
 
 The net effect is a difficulty ladder that is now steep and monotone at every rung (Easy < Normal < Hard with clear margins), and a Hard tier that actively hunts for the kill in the late game — the intended "fun, dangerous challenge" target. As before, these are self-play measurements; the qualitative gains (clear ladder, more finishes) are robust across runs, but absolute human difficulty must still be confirmed by playtesting.
 
+### 6.6 V2 campaign — territorial rules and full-turn Hard AI
+
+A third campaign measures the **V2 ruleset** (§2.3): rival-zone cells scored at double weight, the three-zone presence chain gating invasion, and a Hard tier reworked around them with full four-cell turn planning (§5.5), home-anchor defense, and weighted invasion (§5.4). Easy and Normal keep their per-cell greedy path; only Hard changed structurally. The harness is the same one used in §6.1, updated for the weighted termination metric, the new reachability predicate, and the full-turn planner. Each matchup ran 150–200 games.
+
+**V2:**
+
+| matchup (P1 vs P2) | P1 win% | P2 win% | draw% | extinction% | mean round | mean margin |
+|---|---|---|---|---|---|---|
+| easy vs easy | 64 | 36 | 1 | 37 | 10.1 | 15.8 |
+| normal vs normal | 66 | 32 | 3 | 4 | 11.8 | 19.5 |
+| hard vs hard | 50 | 46 | 4 | 32 | 10.8 | 13.0 |
+| easy vs normal | 21 | 77 | 2 | 21 | 10.9 | 18.9 |
+| easy vs hard | 1 | 99 | 0 | 66 | 9.2 | 28.8 |
+| normal vs hard | 5 | 92 | 3 | 19 | 11.0 | 23.5 |
+
+**(V1) The ladder stays steep and monotone, and widens at the top.** Hard dominates every lower tier more decisively than under v5.5: Easy-vs-Hard moved to 99% and Normal-vs-Hard to 92% (from 89% and 64%). The full-turn planner is the main driver — coordinating four cells under lookahead beats greedy per-cell play, which is what Normal and Easy still do.
+
+**(V2) Invasion becomes a measurable strategic axis.** Because rival-zone cells count x2, the weighted margins in asymmetric matchups widen sharply (Easy-vs-Hard mean margin 28.8 vs ~single-digit raw-count margins under v5.5): Hard reaches and holds the doubled enemy zone while weaker tiers rarely complete the presence chain. The mechanic does what it was designed to do — reward a sustained territorial push rather than a static home colony.
+
+**(V3) Decisiveness against weaker play rose again.** Easy-vs-Hard extinctions reached 66% (from 34% under v5.5); the planner finds whole-turn configurations that collapse a weak colony rather than merely out-counting it. Normal-vs-Hard extinctions (19%) also exceed the v5.5 figure (0%).
+
+**(V4) Home-anchor defense is robust.** The §2.3 re-lock makes losing the home zone near-fatal under V2. Across the full V2 campaign — and a separate adversarial stress test in which the opponent invades the CPU's home zone every turn — the AI never lost its anchor while still alive (0 occurrences over several thousand turns), confirming the anchor-defense term holds under pressure.
+
+**(V5) Top-tier mirror play carries higher variance.** Hard-vs-Hard is near-even (≈50–46) but its extinction rate fluctuates more run-to-run (≈28–37% across runs reported here, with occasional higher excursions) than the lower-tier matchups. This is expected: when both sides run the same lookahead planner, small noise differences cascade through the coordinated four-cell sets, so symmetric top play is less stable than the decisive asymmetric matchups that the design actually targets. As with the earlier campaigns, the qualitative conclusions (steep ladder, decisive asymmetric play, robust anchor defense) are stable across runs; exact percentages for the mirror matchup are not.
+
 ---
 
 ## 7. Threats to validity
 
-The balance study measures AI-vs-AI play. It establishes the relative ordering and spacing of the tiers under their own heuristic, but not the absolute difficulty experienced by a human, who brings pattern recognition and multi-turn planning the depth-1 AI lacks. Sample sizes (50–120 games per matchup) are adequate for the large effects (Easy vs others) but leave the Normal/Hard margin with wide confidence intervals; the qualitative conclusion (they are close) is robust across runs, but the exact percentage is not. Finally, the harness mirrors the first player by color-swap; while the rules are color-symmetric, any latent asymmetry in the parity tie-break $(r+c)\bmod 2$ could in principle bias mirror matchups, though §2.2 shows that branch is unreachable in normal evolution.
+The balance study measures AI-vs-AI play. It establishes the relative ordering and spacing of the tiers under their own heuristic, but not the absolute difficulty experienced by a human, who brings pattern recognition and multi-turn planning the AI lacks: even the V2 Hard tier, which plans a full four-cell turn, looks only one generation ahead. Sample sizes (50–200 games per matchup) are adequate for the large effects (every asymmetric matchup) but leave the symmetric top-tier matchup with wider variance; the qualitative conclusions are robust across runs, but the exact mirror-match percentages are not. Finally, the harness mirrors the first player by color-swap; while the rules are color-symmetric, any latent asymmetry in the parity tie-break $(r+c)\bmod 2$ could in principle bias mirror matchups, though §2.2 shows that branch is unreachable in normal evolution.
 
 ---
 
 ## 8. Conclusion
 
-Conway's Conquerors is a finite, deterministic, perfect-information game built on a faithful two-color Life automaton, served by a compact dependency-free authoritative architecture. Its difficulty AI is a depth-1 heuristic whose central device — one-step local simulation of $\Delta_{\text{own}}$ — eliminates the suicidal and kamikaze failure modes that plague naive neighbor-counting opponents. Baseline self-play confirmed a correctly ordered but unevenly-spaced ladder, with Normal and Hard nearly indistinguishable and high-tier games rarely decisive. Two difficulty-exclusive changes to Hard — a scaled bomb threshold and a late-game killer-instinct term — restored a steep, monotone ladder and a Hard tier that actively hunts the kill, without disturbing the lower tiers, as confirmed by a second self-play campaign reported alongside the first. Learning is handled separately from challenge: a practice sandbox (single-device control of both colonies), an animated multi-slide tutorial covering zones, the B3/S23 rules and invasion, an optional guided mode that previews each evolution before it is committed, and a progressive rotating coach make the systems approachable without diluting the competitive AI. The determinism, locality, and irreversibility the game inherits from Life are not incidental: they are the mechanics, turning a zero-player automaton into a contest of reading a system that has no favorites.
+Conway's Conquerors is a finite, deterministic, perfect-information game built on a faithful two-color Life automaton, served by a compact dependency-free authoritative architecture. Its difficulty AI is a one-generation heuristic whose central device — local simulation of $\Delta_{\text{own}}$ — eliminates the suicidal and kamikaze failure modes that plague naive neighbor-counting opponents. Baseline self-play confirmed a correctly ordered but unevenly-spaced ladder; two difficulty-exclusive changes to Hard (a scaled bomb threshold and a late-game killer-instinct term) restored a steep, monotone ladder without disturbing the lower tiers. The **V2 ruleset** then adds a genuine territorial dimension: rival-zone cells scored at double weight turn invasion into a quantifiable objective, while a three-zone presence chain — re-locked the moment the home anchor falls — makes that objective expensive to reach and to hold. The Hard tier was reworked to match, planning the full four-cell turn under one-generation lookahead, defending its anchor, and pursuing the x2 zone; self-play shows the ladder stays steep and monotone (Hard 99–1 over Easy, 92–5 over Normal), asymmetric play grows more decisive (Easy-vs-Hard extinction 66%), and the anchor defense never fails under pressure. Learning is handled separately from challenge: a practice sandbox (single-device control of both colonies), an animated multi-slide tutorial covering zones, the B3/S23 rules and invasion, an optional guided mode that previews each evolution before it is committed, and a progressive rotating coach make the systems approachable without diluting the competitive AI. The determinism, locality, and irreversibility the game inherits from Life are not incidental: they are the mechanics, turning a zero-player automaton into a contest of reading a system that has no favorites.
 
 ---
 

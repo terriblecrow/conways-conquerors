@@ -501,8 +501,20 @@ class Room {
     return n;
   }
 
+  // V2 weighted score: a player's own cell inside the RIVAL home zone counts x2;
+  // cells in own zone / neutral count x1. Used for the majority win decision and
+  // the reported result, while count() (raw cells) drives the extinction check.
+  score(p) {
+    const enemy = p===1?2:1;
+    let n=0;
+    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++)
+      if (this.board[r][c]===p) n += (zoneOf(c)===enemy ? 2 : 1);
+    return n;
+  }
+
   reachableZones(p) {
     const zones = new Set([p]), enemy = p===1?2:1;
+    // anchor at home: at least one own cell in own zone → unlocks neutral
     let hasOwn=false;
     outer: for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
       if(this.board[r][c]===p && zoneOf(c)===p){hasOwn=true;break outer;}
@@ -513,7 +525,8 @@ class Room {
     let hasEnemy=false;
     outer3: for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
       if(this.board[r][c]===p && zoneOf(c)===enemy){hasEnemy=true;break outer3;}
-    if(hasNeutral && hasEnemy) zones.add(enemy);
+    // V2: enemy zone unlocked only with the full presence chain — home AND neutral AND enemy
+    if(hasOwn && hasNeutral && hasEnemy) zones.add(enemy);
     return zones;
   }
 
@@ -554,18 +567,19 @@ class Room {
 
   finishTurn() {
     this.evolve();
-    const p1 = this.count(1), p2 = this.count(2);
+    const p1 = this.count(1), p2 = this.count(2);   // raw cells — extinction check
     if (this.player === 2) this.round++;
     const bothPlayed = this.round >= 2 || (this.round===1 && this.player===2);
 
     if (bothPlayed) {
-      if (!p1 && !p2) { this.endGame(0, p1, p2); return; }
-      if (!p1)        { this.endGame(2, p1, p2); return; }
-      if (!p2)        { this.endGame(1, p1, p2); return; }
+      if (!p1 && !p2) { this.endGame(0, this.score(1), this.score(2)); return; }
+      if (!p1)        { this.endGame(2, this.score(1), this.score(2)); return; }
+      if (!p2)        { this.endGame(1, this.score(1), this.score(2)); return; }
     }
     if (this.round > MAX_ROUNDS) {
-      const winner = p1>p2 ? 1 : p2>p1 ? 2 : 0;
-      this.endGame(winner, p1, p2); return;
+      const s1 = this.score(1), s2 = this.score(2); // weighted score — majority decision
+      const winner = s1>s2 ? 1 : s2>s1 ? 2 : 0;
+      this.endGame(winner, s1, s2); return;
     }
 
     this.abilityCooldown[0] = Math.max(0, this.abilityCooldown[0]-1);

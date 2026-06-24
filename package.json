@@ -1,6 +1,6 @@
 {
   "name": "conways-conquerors",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "description": "A 1v1 strategy game built on Conway's Game of Life — vs CPU and online multiplayer. Zero dependencies.",
   "main": "server.js",
   "type": "commonjs",
@@ -24,10 +24,10 @@
   "homepage": "https://terriblecrow.com/conquerors/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_USERNAME/conways-conquerors.git"
+    "url": "https://github.com/terriblecrow/conways-conquerors.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/conways-conquerors/issues"
+    "url": "https://github.com/terriblecrow/conways-conquerors/issues"
   },
   "engines": {
     "node": ">=18"
