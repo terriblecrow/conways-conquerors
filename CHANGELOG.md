@@ -1,95 +1,80 @@
 # Changelog
 
-All notable changes to Conway's Conquerors. This project loosely follows
-[Semantic Versioning](https://semver.org/).
+All notable changes to Conway's Conquerors are documented here.
+The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [7.0.0] — V2 territorial rules & full-turn AI
+## [6.8] — 2026-06-28
 
-- **Enemy territory counts double.** Each of a player's cells inside the rival's
-  home zone is now worth x2 toward their score. The final-majority win is decided
-  on this weighted score; extinction still wins outright. HUD bars and the
-  end-of-game result use the weighted score, while raw cell count still drives
-  the extinction check.
-- **Invasion now requires a full chain of presence.** Placing in the enemy zone
-  is legal only while the player simultaneously holds cells at home **and** in
-  neutral **and** already inside the enemy zone. Losing the home anchor re-locks
-  neutral and the enemy zone, as before. (Previously only neutral + enemy
-  presence were required.)
-- **Reworked the Hard AI around the new rules:**
-  - **Full-turn planning.** Instead of greedily committing four cells one at a
-    time, Hard now builds a shortlist of strong candidates and searches for the
-    set of four whose board, after one simulated generation, scores best —
-    weighting surviving rival-zone cells x2.
-  - **Home-anchor defense.** The scorer reinforces the home zone when it runs
-    thin (≤2 cells), since losing it locks the CPU out of neutral and the x2
-    enemy zone. Across thousands of self-play turns the AI never lost its anchor
-    while alive, even against a rival invading its zone every turn.
-  - **Invasion-chain pursuit & weighted invasion.** The AI seeds neutral to
-    unlock the enemy zone and values surviving cells there at x2.
-  - **Smarter bomb.** Now values destroying enemy cells squatting in the CPU's
-    own zone (worth x2 to them) and hard-penalizes blasting its own anchor.
-- Result (self-play): a steep, monotone ladder — Hard beats Normal 92–5 and Easy
-  99–1 — and markedly more decisive games (Easy-vs-Hard ends by extinction 66% of
-  the time). See `RESEARCH-PAPER.md` §6 for the full V2 campaign.
-- Devlog/landing and research paper updated for the V2 rules and AI.
+This release consolidates a large round of online-play fixes, a full
+bilingual pass over the in-game client, a new static/offline build, and the
+migration of the production domain to **conwayconquerors.com**.
 
-## [6.0.0] — Competitive AI tuning
+### Added
+- **Full Spanish/English localization of the game client.** Everything inside
+  `/play` is now translated and switchable at any time from a language button:
+  the lobby, the skippable tutorial (all five slides), the in-game rules modal,
+  the HUD (cells remaining, zone access, bomb/skip buttons), every status
+  message, the public-lobby strings, name/code validation, rematch prompts,
+  chat system messages, and the end-of-game result screen (titles, subtitles,
+  and the long explanations). Practice-mode coaching tips are translated too.
+- **Mutual-consent rematch (online).** Both players must request a rematch
+  before the room restarts. The button reflects state — "Request rematch",
+  "Waiting for opponent…", "Accept rematch ✓" — and falls back cleanly when the
+  opponent has already left.
+- **"Back to menu" button in-game**, available in every mode; it cleanly tears
+  down any online connection and returns to the lobby.
+- **Client-side prediction for placements.** Cells render immediately on tap and
+  reconcile against the authoritative server, removing the round-trip lag that
+  was visible even on good connections. Rejected moves revert automatically.
+- **Robust server-disconnect handling.** A dropped WebSocket or a stalled poll
+  loop now locks the board, surfaces a centered "Connection lost" overlay, and
+  offers a "Back to menu" button — the game no longer hangs or lets you keep
+  placing cells after the server is gone.
+- **Static / offline build** for itch.io. With `window.CC_STATIC = true` the
+  client trims the menu to Practice + vs CPU, disables every network call, and
+  drops the service worker, so the game runs from static files with no server.
+- **Trailer section** and a hidden footer easter egg on the landing page.
 
-- Reworked the Hard AI to be more competitive and decisive, based on a self-play
-  balance study (see `RESEARCH-PAPER.md`):
-  - **Difficulty-scaled bomb:** Hard now fires on smaller enemy clusters and a
-    thinner margin, and evaluates the bomb more often. Exclusive to Hard, so it
-    widens the Normal–Hard gap rather than lifting all tiers.
-  - **Killer-instinct term:** from round 7, when the opponent colony is small,
-    Hard prioritises moves that finish it by extinction instead of coasting to a
-    count win.
-- Result: a steep, monotone difficulty ladder (Hard beats Normal 64–35 and Easy
-  89–10 in self-play) and far more decisive games against weaker play.
-- Practice mode: reordered coaching tips so fundamentals come first, added two
-  strategic tips.
-- Updated RR-001 research paper with baseline-vs-tuned data for verification.
+### Changed
+- **Production domain migrated** from `terriblecrow.com` to
+  `conwayconquerors.com` (Discord lobby links, deployment and Android docs).
+  All in-app API calls were already relative, so multiplayer and the
+  leaderboard were unaffected by the move.
+- **Restart button** is now shown only in vs-CPU games; it is hidden in online
+  and local practice, where a unilateral restart makes no sense.
+- The end-of-round counter is clamped so a finished game reads **12/12**
+  instead of briefly showing 13/12.
+- Top navigation no longer overflows on tablets and phones; the language toggle,
+  mute, and PLAY controls stay on one line and the logo never wraps.
+- The "rotate your device" prompt now also covers tablets in landscape (it was
+  phone-only), and its copy is shown in the active language.
+- `play/index.html` loads `game.min.js`; `play/game.js` is kept as the readable,
+  formatted source of the same client, in sync version-for-version.
 
-## [5.9.0] — In-game chat & public rooms
+### Fixed
+- Text-to-speech for the end-of-game announcement now reliably fires: the
+  cancel-then-speak race is avoided and the synth is warmed up on the first user
+  gesture (fixes silent TTS on mobile Safari/Chrome).
+- The practice-mode zone-transition tips compared against English labels and so
+  never appeared in Spanish; they now key off the zone itself and are localized.
+- Service-worker cache versioning bumped so updated clients are never served
+  stale code after a redeploy.
 
-- **In-game chat** between the two players in any online match (public or
-  private), over the same transport as the game, with spam protection, length
-  limit and text sanitising. Messages are ephemeral and per-match.
-- Devlog/landing updated to document public rooms and chat.
+## [7.0] — 2026-06
 
-## [5.8.0] — Persistent leaderboard fix
+- V2 ruleset: cells in enemy territory count double; three-zone invasion chain.
+- AI rebuilt with full four-cell turn planning and one-generation lookahead.
 
-- **Leaderboard now survives redeploys:** persisted to `../cc-data/` (outside the
-  deploy dir) instead of `data/` inside it, with automatic migration from the old
-  location and atomic writes. Overridable via `LEADERBOARD_PATH`.
-- **Fixed win-rate calculation:** vs-CPU losses are now recorded, so players are
-  no longer shown a permanent 100% win rate.
-- "How to play" / "Cómo se juega" renamed to "Rules" / "Reglas".
+## [5.9] — 2026-06
 
-## [5.7.0] — Public lobby
+- Public rooms and in-game chat.
 
-- **Public rooms** listed in a live lobby with a host-country flag (resolved from
-  IP with a dependency-free coarse table). Browse open games and join with one
-  tap, or keep hosting private code-only rooms.
-- Anti-abuse: global room caps, public-room cap, per-IP lobby rate limiting, and
-  a reaper for abandoned public rooms.
+## [5.1] — 2026-06
 
-## [5.6.0] — Player codes (anti-impersonation)
+- Initial public release of the browser game with local, vs-CPU, and online
+  modes.
 
-- Leaderboard keyed by a secret per-browser **player code**, not by name, so a
-  score under a given name only counts with that name's code. Name claim/verify
-  endpoint and backup/restore UI.
-
-## [5.5.0] — Leaderboard & scoring
-
-- **Persistent leaderboard** (JSON on disk, no database) with a four-factor score:
-  opponent strength, victory mode, speed, and margin.
-- Research paper (RR-001) added, plus a Research/Investigación tab on the game
-  landing.
-
-## Earlier
-
-- Online multiplayer with hand-written WebSocket and transparent HTTP long-polling
-  fallback; authoritative server-side move validation.
-- CPU opponent rewrite around one-step local simulation (eliminates suicidal
-  play); three difficulty tiers.
-- Touch input, FX, bilingual EN/ES site, PWA / Android packaging.
+[6.8]: https://github.com/terriblecrow/conways-conquerors/releases
+[7.0]: https://github.com/terriblecrow/conways-conquerors/releases
+[5.9]: https://github.com/terriblecrow/conways-conquerors/releases
+[5.1]: https://github.com/terriblecrow/conways-conquerors/releases

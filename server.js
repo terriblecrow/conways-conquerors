@@ -462,6 +462,7 @@ class Room {
     this.skipUsed = [false, false];
     this.started  = false;
     this.over     = false;
+    this.rematch  = [false, false]; // per-player rematch consent after a game ends
     this.startTime = Date.now(); // for time-to-victory scoring
   }
 
@@ -501,20 +502,8 @@ class Room {
     return n;
   }
 
-  // V2 weighted score: a player's own cell inside the RIVAL home zone counts x2;
-  // cells in own zone / neutral count x1. Used for the majority win decision and
-  // the reported result, while count() (raw cells) drives the extinction check.
-  score(p) {
-    const enemy = p===1?2:1;
-    let n=0;
-    for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++)
-      if (this.board[r][c]===p) n += (zoneOf(c)===enemy ? 2 : 1);
-    return n;
-  }
-
   reachableZones(p) {
     const zones = new Set([p]), enemy = p===1?2:1;
-    // anchor at home: at least one own cell in own zone → unlocks neutral
     let hasOwn=false;
     outer: for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
       if(this.board[r][c]===p && zoneOf(c)===p){hasOwn=true;break outer;}
@@ -525,8 +514,7 @@ class Room {
     let hasEnemy=false;
     outer3: for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++)
       if(this.board[r][c]===p && zoneOf(c)===enemy){hasEnemy=true;break outer3;}
-    // V2: enemy zone unlocked only with the full presence chain — home AND neutral AND enemy
-    if(hasOwn && hasNeutral && hasEnemy) zones.add(enemy);
+    if(hasNeutral && hasEnemy) zones.add(enemy);
     return zones;
   }
 
@@ -567,19 +555,18 @@ class Room {
 
   finishTurn() {
     this.evolve();
-    const p1 = this.count(1), p2 = this.count(2);   // raw cells — extinction check
+    const p1 = this.count(1), p2 = this.count(2);
     if (this.player === 2) this.round++;
     const bothPlayed = this.round >= 2 || (this.round===1 && this.player===2);
 
     if (bothPlayed) {
-      if (!p1 && !p2) { this.endGame(0, this.score(1), this.score(2)); return; }
-      if (!p1)        { this.endGame(2, this.score(1), this.score(2)); return; }
-      if (!p2)        { this.endGame(1, this.score(1), this.score(2)); return; }
+      if (!p1 && !p2) { this.endGame(0, p1, p2); return; }
+      if (!p1)        { this.endGame(2, p1, p2); return; }
+      if (!p2)        { this.endGame(1, p1, p2); return; }
     }
     if (this.round > MAX_ROUNDS) {
-      const s1 = this.score(1), s2 = this.score(2); // weighted score — majority decision
-      const winner = s1>s2 ? 1 : s2>s1 ? 2 : 0;
-      this.endGame(winner, s1, s2); return;
+      const winner = p1>p2 ? 1 : p2>p1 ? 2 : 0;
+      this.endGame(winner, p1, p2); return;
     }
 
     this.abilityCooldown[0] = Math.max(0, this.abilityCooldown[0]-1);
@@ -593,6 +580,7 @@ class Room {
 
   endGame(winner, p1, p2) {
     this.over = true;
+    this.rematch = [false, false];
     const elapsedSec = Math.round((Date.now() - this.startTime) / 1000);
     const byExtinction = (p1 === 0 || p2 === 0);
     // include the final board: when the game ends by extinction the 'evolve'
@@ -618,6 +606,7 @@ class Room {
 
   restart() {
     if (this.cleanupTimer) { clearTimeout(this.cleanupTimer); this.cleanupTimer = null; }
+    this.rematch = [false, false];
     this.board = Array.from({length:ROWS}, () => new Int8Array(COLS));
     this.player = 1; this.moves = MPT; this.round = 1;
     this.abilityCooldown = [0,0]; this.skipUsed = [false,false]; this.over = false;
@@ -847,8 +836,27 @@ function handleMessage(socket, msg) {
   }
 
   if (type === 'restart') {
-    if (room.playerCount() < 2) return;
-    room.restart();
+    // Rematch requires BOTH players to consent. The requester is flagged; the
+    // opponent is notified ("waiting"). Only when both have asked does the room
+    // actually reset. This fixes single-click rematches that silently did
+    // nothing when the opponent had already left, and prevents one player from
+    // resetting the board out from under the other.
+    if (!room.over) return;                 // only after a game has ended
+    if (room.playerCount() < 2) {           // opponent gone — nothing to rematch
+      socket.send(JSON.stringify({ type:'rematch_declined', reason:'left' }));
+      return;
+    }
+    const me = socket._player - 1;          // 0 or 1
+    if (me !== 0 && me !== 1) return;
+    room.rematch[me] = true;
+    const other = me === 0 ? 1 : 0;
+    if (room.rematch[other]) {
+      room.restart();                       // both agreed → go
+    } else {
+      // tell requester we're waiting, and tell the opponent a rematch was asked
+      socket.send(JSON.stringify({ type:'rematch_waiting' }));
+      room.sendTo(other, { type:'rematch_offer' });
+    }
     return;
   }
 }
@@ -1095,7 +1103,7 @@ server.on('upgrade', upgradeToWS);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('');
-  console.log('  Conway\'s Conquerors v6.1 (open-source page + Discord notifications) — server up on port ' + PORT);
+  console.log('  Conway\'s Conquerors v6.2 (open-source page + Discord notifications) — server up on port ' + PORT);
   console.log('  Routes: /  /conquerors/  /play/  /api/*');
   console.log('  Online play: WebSocket + automatic HTTP-polling fallback');
   console.log('  Limits: ' + LIMITS.ROOMS_PER_IP + ' rooms/IP · ' + LIMITS.JOINS_PER_MIN + ' joins/min/IP');
